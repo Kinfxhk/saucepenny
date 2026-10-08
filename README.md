@@ -20,6 +20,8 @@ recipes, such as a sauce or a syrup). Saucepenny works out the cost of every rec
 - English and Traditional Chinese.
 - Licence: [AGPL-3.0-or-later](LICENSE).
 
+![The Recipes tab: char siu rice with its char siu sub-recipe expanded, line costs, shares and cost per portion](docs/screenshot.png)
+
 ### Use it
 
 - **In the browser:** <https://kinfxhk.github.io/saucepenny/> — nothing to install, and
@@ -110,6 +112,8 @@ If Saucepenny helps you, you can support it at
 - 無需帳戶、無伺服器、無遙測、無月費；供應商價錢只存於你的瀏覽器。
 - 提供英文及繁體中文介面。
 - 授權：[AGPL-3.0-or-later](LICENSE)。
+
+![食譜分頁：叉燒飯，展開叉燒子食譜，顯示每行成本、佔比及每份成本](docs/screenshot.png)
 
 ### 使用方法
 
