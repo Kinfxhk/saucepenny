@@ -282,7 +282,7 @@ describe('migration', () => {
 // ---------------------------------------------------------------------------------
 // Mutation testing: broken copies of model/ must fail the hostile-input table.
 // ---------------------------------------------------------------------------------
-type ModelModule = typeof import('../src/model/index');
+type ModelModule = typeof model;
 
 function runModelGolden(m: ModelModule): string[] {
   const fails: string[] = [];
