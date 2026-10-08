@@ -439,3 +439,30 @@ td[data-band='high'] {
 #recipe-weight {
   white-space: normal;
 }
+/* v0.3: menu engineering and supplier price lists */
+#menu-eng,
+#supplier {
+  margin-top: 2rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+#eng-table input.num {
+  width: 6rem;
+}
+td[data-quadrant='keep'] {
+  background: var(--good-bg);
+  color: var(--good);
+  font-weight: 700;
+}
+td[data-quadrant='raise-margin'],
+td[data-quadrant='promote'] {
+  background: var(--watch-bg);
+  color: var(--watch);
+}
+td[data-quadrant='rethink'] {
+  background: var(--high-bg);
+  color: var(--high);
+}
+#supplier-table select {
+  max-width: 14rem;
+}

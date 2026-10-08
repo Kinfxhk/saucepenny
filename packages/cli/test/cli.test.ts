@@ -37,7 +37,7 @@ describe('argument parsing', () => {
     expect(run(['cost', file, '--lang', 'fr']).code).toBe(1);
   });
   it('--version, --help, no command, unknown command', () => {
-    expect(run(['--version'])).toEqual({ code: 0, out: '0.2.1\n', err: '' });
+    expect(run(['--version'])).toEqual({ code: 0, out: '0.3.0\n', err: '' });
     expect(run(['--help']).out).toMatch(/not accounting or tax advice/);
     expect(run([]).code).toBe(1);
     expect(run(['bake', file]).code).toBe(1);

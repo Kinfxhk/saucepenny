@@ -10,6 +10,8 @@ const KEY = 'current';
 export const SETTINGS_KEY = 'saucepenny-settings';
 /** When the last backup file was saved and how many changes since (v0.2). */
 export const BACKUP_KEY = 'saucepenny-backup';
+/** supplier item name → ingredient id, remembered from supplier price-list imports */
+export const SUPPLIER_MAP_KEY = 'saucepenny-supplier-map';
 
 let cached: IDBDatabase | undefined;
 
@@ -66,6 +68,7 @@ export async function wipeAll(): Promise<void> {
   try {
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(BACKUP_KEY);
+    localStorage.removeItem(SUPPLIER_MAP_KEY);
   } catch {
     /* ignore */
   }
@@ -114,5 +117,28 @@ export function saveBackupState(s: BackupState): void {
     localStorage.setItem(BACKUP_KEY, JSON.stringify(s));
   } catch {
     /* ignore */
+  }
+}
+
+export function loadSupplierMap(): Record<string, string> {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(SUPPLIER_MAP_KEY) ?? '{}');
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    const out: Record<string, string> = Object.create(null) as Record<string, string>;
+    for (const [k, id] of Object.entries(v as Record<string, unknown>))
+      if (typeof id === 'string' && k.length <= 200 && id.length <= 100) out[k] = id;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function saveSupplierMap(m: Record<string, string>): void {
+  try {
+    // keep it small: at most 2000 remembered names
+    const entries = Object.entries(m).slice(-2000);
+    localStorage.setItem(SUPPLIER_MAP_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    /* storage full or blocked: matching by name still works */
   }
 }

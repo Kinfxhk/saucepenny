@@ -66,6 +66,13 @@ for (const lang of Object.keys(HEADERS) as Lang[])
   for (const col of INGREDIENT_COLUMNS) ALIASES[key(HEADERS[lang][col])] = col;
 for (const [alias, col] of Object.entries({
   ingredient: 'name',
+  item: 'name',
+  product: 'name',
+  品名: 'name',
+  貨品: 'name',
+  packsize: 'packQty',
+  包裝: 'packQty',
+  cost: 'price',
   食材: 'name',
   食材名稱: 'name',
   qty: 'packQty',
@@ -101,6 +108,8 @@ export type ImportProblem =
 export interface ImportResult {
   ingredients: StoredIngredient[];
   problems: ImportProblem[];
+  /** CSV line of each imported ingredient (same order) */
+  lines?: number[];
 }
 
 const NUMERIC: IngredientColumn[] = ['packQty', 'price', 'yieldPercent', 'density', 'pieceWeight'];
@@ -224,7 +233,8 @@ export function importIngredientsCsv(
         error: { ...e, path: col },
       });
     }
-  return { ingredients: candidates.filter((_, k) => !badRows.has(k)).map((c) => c.ing), problems };
+  const kept = candidates.filter((_, k) => !badRows.has(k));
+  return { ingredients: kept.map((c) => c.ing), problems, lines: kept.map((c) => c.line) };
 }
 
 export function describeImportProblem(

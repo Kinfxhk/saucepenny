@@ -6,7 +6,9 @@
 //   node --import tsx tools/oracle/bridge.ts < cases.json > results.json
 
 import {
+  applySupplierPrices,
   convert,
+  importSalesCsv,
   parseQuantity,
   recordPriceChange,
   validateProject,
@@ -17,6 +19,10 @@ import {
   type Rational,
   type StoredIngredient,
   type UnitId,
+  type UnitRef,
+  type VerifiedProject,
+  unitPriceChange,
+  verifiedMenuEngineering,
 } from '../../packages/core/src/index';
 
 const q = (r: Rational | null | undefined) => (r ? `${r.n}/${r.d}` : null);
@@ -26,7 +32,43 @@ interface Cases {
   convert: { qty: string; from: UnitId; to: UnitId; density?: string; piece?: string }[];
   projects: unknown[];
   prices: { ing: StoredIngredient; before: PriceSnapshot; today: string }[];
+  /** sales counts per project (same order as projects), for menu engineering */
+  projectSales?: Record<string, number>[];
+  /** margin "n/d"; null = not costed; "noprice" = costed but no price */
+  menuEng?: { id: string; sold: number; margin: string | null }[][];
+  sales?: { text: string; menu: { id: string; name: string }[] }[];
+  supplier?: {
+    old: StoredIngredient;
+    row: { price: string; packQty: string; packUnit: UnitRef; priceDate?: string };
+    today: string;
+  }[];
 }
+
+const engOut = (r: ReturnType<typeof verifiedMenuEngineering>) =>
+  r.status === 'ok'
+    ? {
+        status: 'ok',
+        average: q(r.averageMargin),
+        line: q(r.popularLine),
+        totalMargin: q(r.totalMargin),
+        totalSold: r.totalSold,
+        rows: r.rows.map((x) => [x.id, x.quadrant, q(x.mix)]),
+        excluded: r.excluded,
+      }
+    : r.status === 'empty'
+      ? { status: 'empty', reason: r.reason, excluded: r.excluded }
+      : { status: 'mismatch', detail: r.detail };
+
+const oneIngredient = (ing: StoredIngredient) => ({
+  schema: 'saucepenny/project',
+  version: 2,
+  name: 'x',
+  settings: { currency: 'HKD', serviceChargePercent: '10', goodPercent: '30', highPercent: '35' },
+  measures: [],
+  ingredients: [ing],
+  recipes: [],
+  menu: [],
+});
 
 const frac = (s: string): Rational => {
   const [n, d = '1'] = s.split('/');
@@ -56,7 +98,7 @@ const out = {
     const r = convert(frac(c.qty), c.from, c.to, info);
     return r.ok ? ['ok', q(r.value)] : ['err', r.error.code];
   }),
-  projects: cases.projects.map((p) => {
+  projects: cases.projects.map((p, k) => {
     const v = validateProject(p);
     if (!v.ok) return { invalid: v.errors.slice(0, 5) };
     const proj = v.value.project;
@@ -102,7 +144,14 @@ const out = {
               suggestedFoodCost: q(m.suggestedFoodCost),
             }
           : { status: m.status };
-    return { recipes, menu };
+    const sold = cases.projectSales?.[k];
+    return {
+      recipes,
+      menu,
+      ...(sold
+        ? { menuEng: engOut(verifiedMenuEngineering(all, new Map(Object.entries(sold)))) }
+        : {}),
+    };
   }),
   prices: cases.prices.map((c) => {
     const next = recordPriceChange(c.ing, c.before, c.today);
@@ -128,6 +177,54 @@ const out = {
       priceDate: next.priceDate ?? null,
       change:
         ch === null ? null : ch.status === 'ok' ? { change: q(ch.change) } : { status: ch.status },
+    };
+  }),
+  menuEng: (cases.menuEng ?? []).map((items) => {
+    const menu = new Map(
+      items.map((x) => [
+        x.id,
+        x.margin === null
+          ? { status: 'error' }
+          : { status: 'ok', grossProfit: x.margin === 'noprice' ? null : frac(x.margin) },
+      ]),
+    );
+    const sold = new Map(items.map((x) => [x.id, x.sold]));
+    return engOut(
+      verifiedMenuEngineering({ recipes: new Map(), menu } as unknown as VerifiedProject, sold),
+    );
+  }),
+  sales: (cases.sales ?? []).map((c) => {
+    const r = importSalesCsv(c.text, c.menu);
+    return {
+      sold: Object.fromEntries(r.sold),
+      merged: [...r.merged].sort(),
+      problems: r.problems.map((p) =>
+        p.kind === 'row' ? [p.line, p.code] : p.kind === 'header' ? [0, p.column] : [-1, 'csv'],
+      ),
+    };
+  }),
+  supplier: (cases.supplier ?? []).map((c) => {
+    const v = validateProject(oneIngredient(c.old));
+    if (!v.ok) return { invalid: v.errors.slice(0, 3) };
+    const ch = unitPriceChange(v.value.project.ingredients.get(c.old.id)!, c.row, new Map());
+    const applied = applySupplierPrices(
+      oneIngredient(c.old) as unknown as Parameters<typeof applySupplierPrices>[0],
+      [{ ingredientId: c.old.id, row: c.row }],
+      c.today,
+    );
+    if (!applied.ok) return { error: applied.code };
+    const after = applied.project.ingredients[0]!;
+    const valid = validateProject(applied.project).ok;
+    return {
+      change:
+        ch.status === 'ok'
+          ? { before: q(ch.before), after: q(ch.after), change: q(ch.change) }
+          : { status: ch.status },
+      changed: applied.changed.length === 1,
+      price: after.price,
+      priceDate: after.priceDate ?? null,
+      history: after.priceHistory ?? [],
+      valid,
     };
   }),
 };

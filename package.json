@@ -1,7 +1,7 @@
 {
   "name": "saucepenny-monorepo",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Saucepenny (菜本易): free, offline, open-source recipe costing and menu pricing. Exact arithmetic; every number re-checked by an independent checker.",
   "license": "AGPL-3.0-or-later",
   "homepage": "https://kinfxhk.github.io/saucepenny/",

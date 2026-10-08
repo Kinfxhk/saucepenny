@@ -10,6 +10,7 @@ import {
   netPriceOf,
   recomputeExtras,
   recomputeMenu,
+  recomputeMenuEngineering,
   recomputeWeight,
 } from './check/index';
 import {
@@ -17,11 +18,14 @@ import {
   hasExtras,
   ingredientCost,
   maxYield,
+  menuEngineering,
   priceImpact,
   priceItem,
   recipeExtras,
   recipeWeight,
   withPrice,
+  type MenuEngInput,
+  type MenuEngResult,
   type ImpactRow,
   type MenuCost,
   type RecipeCost,
@@ -351,4 +355,60 @@ export function verifiedPriceChange(ing: Ingredient): VerifiedPriceChange | null
   const check = sub(div(ing.price, from.price), rat(1n));
   if (!eq(engine, check)) return { status: 'mismatch', detail: 'price change' };
   return { status: 'ok', from, change: engine };
+}
+
+// ---- Menu engineering (v0.3) -----------------------------------------------------------
+
+export type MenuEngExcluded = { id: string; reason: 'no-price' | 'not-costed' };
+
+export type VerifiedMenuEng =
+  | (Extract<MenuEngResult, { ok: true }> & { status: 'ok'; excluded: MenuEngExcluded[] })
+  | { status: 'empty'; reason: 'no-items' | 'no-sales'; excluded: MenuEngExcluded[] }
+  | { status: 'mismatch'; detail: string };
+
+/**
+ * Menu engineering over the verified menu: items whose cost could not be verified, or with
+ * no price, are left out (and listed). Items without a sales count count as 0 sold.
+ * The quadrants and the average margin are recomputed by the checker without division.
+ */
+export function verifiedMenuEngineering(
+  verified: VerifiedProject,
+  sold: ReadonlyMap<string, number>,
+  /** injectable for mutation tests */
+  engine: typeof menuEngineering = menuEngineering,
+): VerifiedMenuEng {
+  const items: MenuEngInput[] = [];
+  const excluded: MenuEngExcluded[] = [];
+  for (const [id, v] of verified.menu) {
+    if (v.status !== 'ok') excluded.push({ id, reason: 'not-costed' });
+    else if (v.grossProfit === null) excluded.push({ id, reason: 'no-price' });
+    else {
+      const n = sold.get(id) ?? 0;
+      if (!Number.isSafeInteger(n) || n < 0) return { status: 'mismatch', detail: `sold ${id}` };
+      items.push({ id, sold: n, margin: v.grossProfit });
+    }
+  }
+  const res = engine(items);
+  const chk = recomputeMenuEngineering(items);
+  if (!res.ok) {
+    if (chk !== null) return { status: 'mismatch', detail: 'empty' };
+    return { status: 'empty', reason: res.reason, excluded };
+  }
+  if (chk === null) return { status: 'mismatch', detail: 'not empty' };
+  if (BigInt(res.totalSold) !== chk.totalSold) return { status: 'mismatch', detail: 'total sold' };
+  if (!eq(res.totalMargin, chk.marginSum)) return { status: 'mismatch', detail: 'total margin' };
+  if (!eq(mul(res.averageMargin, rat(chk.totalSold)), chk.marginSum))
+    return { status: 'mismatch', detail: 'average margin' };
+  if (res.rows.length !== items.length) return { status: 'mismatch', detail: 'rows' };
+  for (const [k, r] of res.rows.entries()) {
+    const x = items[k]!;
+    if (r.id !== x.id || r.sold !== x.sold || !eq(r.margin, x.margin))
+      return { status: 'mismatch', detail: `row ${x.id}` };
+    if (chk.quadrants.get(r.id) !== r.quadrant) return { status: 'mismatch', detail: r.id };
+    if (!eq(mul(r.mix, rat(chk.totalSold)), rat(BigInt(r.sold))))
+      return { status: 'mismatch', detail: `mix ${r.id}` };
+    if (!eq(r.totalMargin, mul(rat(BigInt(r.sold)), r.margin)))
+      return { status: 'mismatch', detail: `total ${r.id}` };
+  }
+  return { status: 'ok', ...res, excluded };
 }

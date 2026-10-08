@@ -124,7 +124,40 @@ for an extra topping, or 250 ml of soup).
   target 32.0% → suggested 78.00 (at suggested 30.2%)
 ```
 
+### Menu engineering (v0.3)
+
+Below the menu table, **Menu engineering** groups your dishes by popularity and margin.
+Type how many of each item you sold in a period, or **Import sales CSV** with two columns
+`item` (menu item name) and `sold` (Chinese headers `項目`, `售出` also work; repeated
+items are added together, and unknown names or bad numbers are listed by line).
+**Download sales sheet** gives a ready file with every menu item.
+
+- **Margin** = price without service charge − cost per portion.
+- **Share of sales** = sold ÷ total sold. An item is **popular** when its share is at
+  least 70% of an equal share (with 4 items: 0.7 ÷ 4 = 17.5%).
+- **High margin** when the margin is at least the sales-weighted average margin.
+- Groups: **Keep** (popular, high margin), **Raise margin** (popular, low margin),
+  **Promote** (high margin, less popular), **Rethink** (low margin, less popular).
+  Items without a price or a verified cost are left out and listed.
+
+With the example project and 320 char siu rice, 540 milk tea, 150 iced lemon tea and 40
+extra char siu sold (1,050 in all), the weighted average margin is 19.15 and an item is
+popular from 17.5%: char siu rice (30.5%, margin 28.46) is **Keep**, milk tea (51.4%,
+14.68) is **Raise margin**, and iced lemon tea (14.3%, 15.54) and extra char siu (3.8%,
+18.67) are **Rethink**. **Export analysis (CSV)** saves the table. Sales counts are not
+saved in the project.
+
 ## 5. Price change
+
+### Supplier price lists (v0.3)
+
+**Update prices from a supplier list** reads a CSV with the columns name, pack qty, unit
+and price (price date optional; other columns such as a supplier code are ignored). Each
+row is matched to one of your ingredients by identical name, or by a match you chose
+before on this device; pick the ingredient for any row that is not matched. The table
+shows the price now, the new price and the change **per unit** (for example 13 / 1 kg →
+28 / 2 kg is +7.7% per unit). Rows with the same price are left unticked. Nothing
+changes until you press **Apply**; old prices go into each ingredient's price history.
 
 **Price change** shows what happens if one ingredient's pack price changes: every recipe
 and menu item whose cost changes is listed with before, after and the difference,

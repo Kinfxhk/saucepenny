@@ -12,3 +12,4 @@ release/
 test-results/
 playwright-report/
 packages/core/src/*-mutant-*/
+__pycache__/

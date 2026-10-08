@@ -22,6 +22,16 @@ recipes, such as a sauce or a syrup). Saucepenny works out the cost of every rec
 
 ![The Recipes tab: char siu rice with its char siu sub-recipe expanded, line costs, shares and cost per portion](docs/screenshot.png)
 
+### New in v0.3
+
+- **Menu engineering**: type or import (CSV) how many of each dish you sold, and see each
+  item's margin, share of sales and group — Keep, Raise margin, Promote or Rethink —
+  using written, checked rules (rule 16). Sales counts stay in your browser and are not
+  saved in the project.
+- **Supplier price lists**: import a supplier's CSV, match each row to your ingredients
+  (matches are remembered on this device), review the change per unit, then apply. Old
+  prices go into the price history (rule 17).
+
 ### New in v0.2
 
 - **Fractions** in quantities: `1/2`, `1 1/2`, `½`, `1½` (kept exactly as typed).
@@ -131,6 +141,14 @@ If Saucepenny helps you, you can support it at
 - 授權：[AGPL-3.0-or-later](LICENSE)。
 
 ![食譜分頁：叉燒飯，展開叉燒子食譜，顯示每行成本、佔比及每份成本](docs/screenshot.png)
+
+### v0.3 新功能
+
+- **餐牌分析**：輸入或匯入（CSV）每款菜式售出多少份，即可看到每項的毛利、銷售佔比及分類——
+  主力、提高毛利、多推廣或檢討——全按公開及經核對的規則（規則 16）。銷售份數只留在瀏覽器，
+  不會存入項目。
+- **供應商價目表**：匯入供應商的 CSV，把每行配對到你的食材（配對會記在這部裝置），檢查每單位
+  的價錢變動後才套用；舊價錢會保留在價格紀錄（規則 17）。
 
 ### v0.2 新功能
 

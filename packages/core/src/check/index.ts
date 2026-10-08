@@ -429,3 +429,38 @@ export function recomputeMenu(
     rawSuggested,
   };
 }
+
+/**
+ * Menu engineering, recomputed without division: an item is popular when
+ * 10 × items × sold ≥ 7 × total sold (whole numbers), and profitable when
+ * margin × total sold ≥ Σ margin × sold (summed from the last item to the first).
+ * Returns each quadrant and the weighted margin sum.
+ */
+export function recomputeMenuEngineering(
+  items: readonly { id: string; sold: number; margin: Rational }[],
+): { quadrants: Map<string, string>; marginSum: Rational; totalSold: bigint } | null {
+  if (items.length === 0) return null;
+  let totalSold = 0n;
+  for (const x of items) totalSold += BigInt(x.sold);
+  if (totalSold === 0n) return null;
+  let marginSum = rat(0n);
+  for (let i = items.length - 1; i >= 0; i--)
+    marginSum = add(marginSum, mul(rat(BigInt(items[i]!.sold)), items[i]!.margin));
+  const n = BigInt(items.length);
+  const quadrants = new Map<string, string>();
+  for (const x of items) {
+    const popular = 10n * n * BigInt(x.sold) >= 7n * totalSold;
+    const profitable = cmp(mul(x.margin, rat(totalSold)), marginSum) >= 0;
+    quadrants.set(
+      x.id,
+      popular && profitable
+        ? 'keep'
+        : popular
+          ? 'raise-margin'
+          : profitable
+            ? 'promote'
+            : 'rethink',
+    );
+  }
+  return { quadrants, marginSum, totalSold };
+}

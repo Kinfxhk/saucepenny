@@ -57,7 +57,9 @@ import {
 } from '@saucepenny/core';
 import sampleText from '../../../examples/cha-chaan-teng.json?raw';
 import { byId, download, fileName, h } from './dom';
+import { renderMenuEng, updateMenuEng, type EngContext } from './menu-eng-ui';
 import { printCards } from './print';
+import { renderSupplier, type SupplierContext } from './supplier-ui';
 import {
   loadBackupState,
   loadSettings,
@@ -111,6 +113,24 @@ const priceSnap = new Map<string, PriceSnapshot>();
 let noteList: string[] = [];
 
 const T = (key: UiKey, params: Record<string, string | number> = {}) => ui(lang, key, params);
+let lastVerified: VerifiedProject | null = null;
+const engCtx: EngContext = {
+  T,
+  lang: () => lang,
+  stored: () => stored,
+  say: (text, list) => say(text, list),
+  verified: () => lastVerified,
+};
+const supplierCtx: SupplierContext = {
+  T,
+  lang: () => lang,
+  stored: () => stored,
+  compiled: () => compiled,
+  say: (text, list) => say(text, list),
+  replace: (p) => replaceProject(p),
+  unitText: (u) => unitText(u as UnitRef),
+  today: () => todayIso(),
+};
 
 function sampleProject(): StoredProject {
   const r = readProjectJson(sampleText);
@@ -1424,6 +1444,7 @@ function renderMenu(panel: HTMLElement): void {
       ),
     ),
     h('ul', { id: 'menu-problems', class: 'problem-list' }),
+    ...(stored.menu.length ? [renderMenuEng(engCtx)] : []),
   );
 }
 
@@ -1447,6 +1468,8 @@ function updateMenu(v: VerifiedProject | null): void {
   }
   const ul = document.getElementById('menu-problems');
   ul?.replaceChildren(...problems.map((p) => h('li', {}, p)));
+  lastVerified = v;
+  updateMenuEng(engCtx);
 }
 
 function addMenu(): void {
@@ -1530,6 +1553,7 @@ function renderImpact(panel: HTMLElement): void {
         h('tbody', {}),
       ),
     ),
+    ...(stored.ingredients.length ? [renderSupplier(supplierCtx)] : []),
   );
 }
 

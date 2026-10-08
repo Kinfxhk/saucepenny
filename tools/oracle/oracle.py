@@ -26,6 +26,7 @@ import random
 import re
 import subprocess
 import sys
+import unicodedata
 from fractions import Fraction as F
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -468,6 +469,244 @@ def rand_parse(rng: random.Random) -> str:
 
 
 # ---- compare --------------------------------------------------------------------------------
+# ---- menu engineering (rule 16), written again from docs/calculation-rules.md -------------
+def menu_eng(items):
+    """items: (id, sold, margin) with margin a Fraction, None (not costed) or "noprice"."""
+    excluded = [{"id": i, "reason": "not-costed" if m is None else "no-price"}
+                for i, _, m in items if m is None or m == "noprice"]
+    use = [(i, s, m) for i, s, m in items if m is not None and m != "noprice"]
+    if not use:
+        return {"status": "empty", "reason": "no-items", "excluded": excluded}
+    total = sum(s for _, s, _ in use)
+    if total == 0:
+        return {"status": "empty", "reason": "no-sales", "excluded": excluded}
+    weighted = sum(m * s for _, s, m in use)
+    avg = weighted / total
+    line = F(7, 10) / len(use)
+    rows = []
+    for i, s, m in use:
+        mix = F(s, total)
+        pop, prof = mix >= line, m >= avg
+        quad = {(True, True): "keep", (True, False): "raise-margin",
+                (False, True): "promote", (False, False): "rethink"}[(pop, prof)]
+        rows.append([i, quad, fs(mix)])
+    return {"status": "ok", "average": fs(avg), "line": fs(line), "totalMargin": fs(weighted),
+            "totalSold": total, "rows": rows, "excluded": excluded}
+
+
+def rand_menu_eng(rng: random.Random):
+    n = rng.randint(1, 12)
+    items = []
+    tie = rng.random() < 0.4
+    margins = [F(rng.randint(-20, 80), rng.choice([1, 2, 10])) for _ in range(3)]
+    for k in range(n):
+        r = rng.random()
+        margin = None if r < 0.05 else "noprice" if r < 0.1 else (
+            rng.choice(margins) if tie else F(rng.randint(-5000, 20000), rng.choice([1, 10, 100])))
+        sold = 0 if rng.random() < 0.1 else rng.randint(0, 10 ** rng.randint(1, 6))
+        items.append([f"m{k}", sold, margin])
+    if tie and rng.random() < 0.5:
+        # put a count exactly on the popularity line: 10 items, 100 sold, one with 7
+        items = [[f"m{k}", 0, F(rng.randint(0, 5))] for k in range(10)]
+        counts = [7, 13, 10, 10, 10, 10, 10, 10, 10, 10]
+        rng.shuffle(counts)
+        for it, c in zip(items, counts):
+            it[1] = c
+    if rng.random() < 0.05:
+        for it in items:
+            it[1] = 0
+    return items
+
+
+def me_payload(items):
+    return [{"id": i, "sold": s, "margin": None if m is None else m if m == "noprice" else fs(m)}
+            for i, s, m in items]
+
+
+# ---- sales CSV (menu engineering input) ------------------------------------------------------
+ITEM_HEADS = ["item", "Item", "menu item", "Menu_Item", "項目", "餐牌項目", "名稱", "name", "dish", "菜式"]
+SOLD_HEADS = ["sold", "Sold", "qty", "quantity", "count", "portions", "售出", "數量", "銷量", "份數"]
+MAX_SOLD = 1_000_000_000
+
+
+def name_key(s: str) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s).strip()).lower()
+
+
+def parse_sold(t: str):
+    t = "".join(chr(ord(c) - 0xFF10 + 48) if "\uff10" <= c <= "\uff19" else "," if c == "，" else c
+                for c in t).strip(" \t\r\n\u3000")
+    if not re.fullmatch(r"[0-9]+|[0-9]{1,3}(,[0-9]{3})+", t):
+        return "bad"
+    n = int(t.replace(",", ""))
+    return "too-many" if n > MAX_SOLD else n
+
+
+def sales_expected(rows, menu):
+    """rows: (line, item, count) after the header; menu: list of {id, name}."""
+    by_name = {}
+    for m in menu:
+        k = name_key(m["name"])
+        by_name[k] = None if k in by_name else m["id"]
+    ids = {m["id"] for m in menu}
+    sold, merged, problems = {}, set(), []
+    for line, item, count in rows:
+        item, count = item.strip(), count.strip()
+        if item == "" and count == "":
+            continue
+        if re.match(r"^'[=+\-@]", item):
+            item = item[1:]
+        k = name_key(item)
+        named = by_name.get(k, "absent")
+        mid = named if named not in (None, "absent") else (item if item in ids else None)
+        if mid is None:
+            problems.append([line, "ambiguous-item" if named is None else "unknown-item"])
+            continue
+        n = parse_sold(count)
+        if n in ("bad", "too-many"):
+            problems.append([line, "bad-sold" if n == "bad" else "too-many-sold"])
+            continue
+        total = sold.get(mid, 0) + n
+        if total > MAX_SOLD:
+            problems.append([line, "too-many-sold"])
+            continue
+        if mid in sold:
+            merged.add(mid)
+        sold[mid] = total
+    return {"sold": sold, "merged": sorted(merged), "problems": problems}
+
+
+FULLW = {c: chr(ord(c) + 0xFEE0) for c in "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"}
+DISH = ["叉燒飯", "凍檸茶", "Beef Noodles", "egg tart", "Milk Tea", "雲吞麵", "Club Sandwich", "菠蘿包"]
+
+
+def vary_name(rng, s):
+    r = rng.random()
+    if r < 0.2:
+        return s.upper()
+    if r < 0.35:
+        return "  " + s.replace(" ", "   ") + " "
+    if r < 0.45:
+        return "".join(FULLW.get(c, c) for c in s)
+    if r < 0.5:
+        return s.replace(" ", "\u3000")
+    return s
+
+
+def count_text(rng, n):
+    r = rng.random()
+    if r < 0.5:
+        return str(n)
+    if r < 0.65:
+        return f"{n:,}"
+    if r < 0.72:
+        return "".join(chr(ord(c) + 0xFEE0) for c in str(n))
+    if r < 0.75:
+        return f"{n:,}".replace(",", "，")
+    return rng.choice(["-3", "1.5", "abc", "", "1,2", "12,34", "1e3", "１,２３４", str(MAX_SOLD),
+                       str(MAX_SOLD + 1), "99999999999999999999", " 42 ", "0", "007", "+5"])
+
+
+def csv_cell(s: str) -> str:
+    return '"' + s.replace('"', '""') + '"' if any(c in s for c in ',"\r\n') else s
+
+
+def rand_sales(rng: random.Random):
+    names = rng.sample(DISH, rng.randint(1, len(DISH)))
+    menu = [{"id": f"m{k}", "name": nm} for k, nm in enumerate(names)]
+    if rng.random() < 0.25:
+        menu.append({"id": f"m{len(menu)}", "name": names[0].lower()})  # two items share a name
+    ih, sh = rng.choice(ITEM_HEADS), rng.choice(SOLD_HEADS)
+    extra = rng.random() < 0.3
+    header = [ih, sh] if rng.random() < 0.7 else [sh, ih]
+    if extra:
+        header.insert(rng.randint(0, 2), "note")
+    if rng.random() < 0.03:
+        header = [rng.choice(["foo", ih]), "bar"]
+    lines = [",".join(csv_cell(h) for h in header)]
+    rows = []
+    for _ in range(rng.randint(0, 25)):
+        if rng.random() < 0.05:
+            lines.append("")  # blank line
+            continue
+        r = rng.random()
+        if r < 0.6:
+            item = vary_name(rng, rng.choice(menu)["name"])
+        elif r < 0.75:
+            item = rng.choice(menu)["id"]
+        elif r < 0.8:
+            item = "'=" + rng.choice(menu)["name"]
+        elif r < 0.9:
+            item = rng.choice(["Soup", "湯", "m99", ""])
+        else:
+            item = vary_name(rng, rng.choice(DISH))
+        count = count_text(rng, rng.choice([rng.randint(0, 50), rng.randint(0, 5000), rng.randint(0, 10 ** 9)]))
+        cells = {ih: item, sh: count, "note": rng.choice(["", "x", "a,b"])}
+        lines.append(",".join(csv_cell(cells.get(h, "")) for h in header))
+        rows.append((len(lines), item, count))
+    text = ("\ufeff" if rng.random() < 0.3 else "") + rng.choice(["\r\n", "\n"]).join(lines)
+    ok_header = ih in header and sh in header
+    return {"text": text, "menu": menu}, (rows if ok_header else None), header
+
+
+# ---- supplier price list ----------------------------------------------------------------------
+def qtext(v: F) -> str:
+    d = v.denominator
+    for p in (2, 5):
+        while d % p == 0:
+            d //= p
+    return dec_text(v) if d == 1 else f"{v.numerator}/{v.denominator}"
+
+
+def rand_supplier(rng: random.Random):
+    unit = rng.choice(UNIT_IDS)
+    op = rand_money(rng) if rng.random() < 0.9 else F(0)
+    oq = rand_qty(rng, 1, 2000)
+    old = {"id": "a", "name": "a", "packQty": qtext(oq), "packUnit": unit, "price": dec_text(op)}
+    if rng.random() < 0.6:
+        old["priceDate"] = f"2026-{rng.randint(1, 9):02d}-{rng.randint(1, 28):02d}"
+    r = rng.random()
+    if r < 0.15:
+        nu, np_, nq = unit, op, oq  # same price
+        nq_text = qtext(oq)
+        if rng.random() < 0.5 and "/" not in nq_text:
+            nq_text += "0" if "." in nq_text else ".0"
+    else:
+        same_dim = [u for u in UNIT_IDS if UNITS[u][0] == UNITS[unit][0]]
+        nu = rng.choice(same_dim) if rng.random() < 0.85 else rng.choice(UNIT_IDS)
+        np_ = rand_money(rng)
+        if rng.random() < 0.2:
+            nq = F(rng.randint(1, 9), rng.choice([2, 3, 4, 8]))
+            nq_text = f"{nq.numerator}/{nq.denominator}" if nq.denominator != 1 else str(nq.numerator)
+        else:
+            nq = rand_qty(rng, 1, 2000)
+            nq_text = qtext(nq)
+    row = {"price": dec_text(np_), "packQty": nq_text, "packUnit": nu}
+    if rng.random() < 0.5:
+        row["priceDate"] = f"2026-10-{rng.randint(1, 8):02d}"
+    case = {"old": old, "row": row, "today": "2026-10-08"}
+    return case, (op, oq, unit, np_, nq, nu)
+
+
+def supplier_expected(case, nums):
+    op, oq, ou, np_, nq, nu = nums
+    old, row, today = case["old"], case["row"], case["today"]
+    if UNITS[ou][0] != UNITS[nu][0]:
+        change = {"status": "not-comparable"}
+    else:
+        b = op / (oq * UNITS[ou][1])
+        a = np_ / (nq * UNITS[nu][1])
+        change = {"before": fs(b), "after": fs(a), "change": None if op == 0 else fs((a - b) / b)}
+    same = op == np_ and oq == nq and ou == nu
+    if same:
+        return {"change": change, "changed": False, "price": old["price"],
+                "priceDate": old.get("priceDate"), "history": [], "valid": True}
+    hist = [] if op == 0 else [{"date": old.get("priceDate") or today, "price": old["price"],
+                                "packQty": old["packQty"], "packUnit": ou}]
+    return {"change": change, "changed": True, "price": row["price"],
+            "priceDate": row.get("priceDate") or today, "history": hist, "valid": True}
+
+
 def fs(x):
     return None if x is None else f"{x.numerator}/{x.denominator}"
 
@@ -506,7 +745,16 @@ def main() -> int:
                                     "price": dec_text(new)}, "before": before, "today": "2026-10-08",
                             "_old": old, "_new": new, "_samepack": pq_old == pq_new, "_date": date})
 
-    payload = {"parse": parse_cases, "convert": conv_cases, "projects": [s for _, s in projects],
+    n_extra = 300 if a.quick else 1500
+    project_sales = []
+    for P, S in projects:
+        project_sales.append({m["id"]: rng.randint(0, 400) for m in S["menu"] if rng.random() < 0.85})
+    me_cases = [rand_menu_eng(rng) for _ in range(n_extra)]
+    sales_cases = [rand_sales(rng) for _ in range(n_extra)]
+    supplier_cases = [rand_supplier(rng) for _ in range(n_extra)]
+    payload = {"projectSales": project_sales, "menuEng": [me_payload(x) for x in me_cases],
+               "sales": [c for c, _, _ in sales_cases], "supplier": [c for c, _ in supplier_cases],
+               "parse": parse_cases, "convert": conv_cases, "projects": [s for _, s in projects],
                "prices": [{k: v for k, v in c.items() if not k.startswith("_")} for c in price_cases]}
     node = os.environ.get("NODE", "node")
     proc = subprocess.run([node, "--import", "tsx", os.path.join("tools", "oracle", "bridge.ts")],
@@ -516,11 +764,12 @@ def main() -> int:
         return 2
     got = json.loads(proc.stdout)
     fails: list[str] = []
-    counts = {"parse": 0, "convert": 0, "recipes": 0, "recipe errors": 0, "menu": 0, "weights": 0, "prices": 0}
+    counts = {"parse": 0, "convert": 0, "recipes": 0, "recipe errors": 0, "menu": 0, "weights": 0, "prices": 0,
+              "menuEngProjects": 0, "menuEng": 0, "salesCsv": 0, "supplier": 0}
 
     def fail(msg):
         if len(fails) < 40:
-            fails.append(msg)
+            fails.append(msg if len(msg) < 600 else msg[:600] + " …")
         else:
             fails.append("")
 
@@ -597,6 +846,14 @@ def main() -> int:
                 want = v if k == "band" else fs(v)
                 if want != t[k]:
                     fail(f"project {i} {mid} {k}: oracle {want} ts {t[k]}")
+        sold = project_sales[i]
+        items = [(m["id"], sold.get(m["id"], 0),
+                  None if em[m["id"]] is None else "noprice" if em[m["id"]]["grossProfit"] is None
+                  else em[m["id"]]["grossProfit"]) for m in S["menu"]]
+        want = menu_eng(items)
+        counts["menuEngProjects"] += 1
+        if g.get("menuEng") != want:
+            fail(f"project {i} menu engineering: oracle {want} ts {g.get('menuEng')}")
 
     for c, g in zip(price_cases, got["prices"]):
         counts["prices"] += 1
@@ -621,6 +878,28 @@ def main() -> int:
             want = {"change": fs((c["_new"] - c["_old"]) / c["_old"])}
         if g["change"] != want:
             fail(f"price change: oracle {want} ts {g['change']} for {c['_old']}→{c['_new']}")
+
+    for items, g in zip(me_cases, got["menuEng"]):
+        counts["menuEng"] += 1
+        want = menu_eng(items)
+        if g != want:
+            fail(f"menu engineering {items}: oracle {want} ts {g}")
+
+    for (case, rows, header), g in zip(sales_cases, got["sales"]):
+        counts["salesCsv"] += 1
+        if rows is None:
+            if not g["problems"] or g["problems"][0][0] != 0 or g["sold"]:
+                fail(f"sales header {header}: ts accepted it: {g}")
+            continue
+        want = sales_expected(rows, case["menu"])
+        if g != want:
+            fail(f"sales csv {case['text']!r}: oracle {want} ts {g}")
+
+    for (case, nums), g in zip(supplier_cases, got["supplier"]):
+        counts["supplier"] += 1
+        want = supplier_expected(case, nums)
+        if g != want:
+            fail(f"supplier {case}: oracle {want} ts {g}")
 
     total_fails = len(fails)
     print(f"saucepenny oracle seed={a.seed}: " + ", ".join(f"{k} {v}" for k, v in counts.items()))

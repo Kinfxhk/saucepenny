@@ -2,3 +2,5 @@
 export * from './csv';
 export * from './ingredients';
 export * from './reports';
+export * from './sales';
+export * from './supplier';

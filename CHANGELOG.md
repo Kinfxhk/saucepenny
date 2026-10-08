@@ -6,6 +6,34 @@ All notable changes to Saucepenny are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-08
+
+Two more items users of other recipe-costing tools ask for. 再加入兩項其他食譜成本工具
+用戶常要求的功能。Calculation rules version 3.
+
+### Added
+
+- **Menu engineering** on the Menu tab (rule 16): sales counts typed in or imported from
+  a CSV (`item`/`sold` or `項目`/`售出`; repeated rows are added and reported; unknown
+  items and bad numbers are listed by line), margin per portion, share of sales, and four
+  groups — Keep, Raise margin, Promote, Rethink — from a 70% popularity line and the
+  sales-weighted average margin. Items without a price or a verified cost are left out
+  and listed. The groups are decided again by the independent checker without division.
+  Download a sales sheet, export the analysis as CSV. Sales counts are not saved in the
+  project and never leave the browser.
+- **Supplier price lists** on the Price change tab (rule 17): import a supplier CSV
+  (same columns as the ingredient list; extra columns such as a supplier code are
+  ignored), match rows to your ingredients (by name or a match remembered on this device),
+  review the change in price per unit (checked a second way), tick the rows to apply.
+  Old prices go into the price history; two rows for one ingredient are refused; the
+  result is validated before it replaces the project. "Delete all data" also removes the
+  remembered matches.
+- Ingredient CSV import accepts a few more header names (`item`, `product`, `品名`,
+  `貨品`, `pack size`, `包裝`, `cost`).
+- The independent Python oracle now also checks menu engineering (on random projects and
+  on random margin/sales lists with exact ties), sales CSV reading and supplier price
+  changes; 13 deliberate bugs in the new code are each caught by it.
+
 ## [0.2.1] - 2026-10-08
 
 ### Fixed

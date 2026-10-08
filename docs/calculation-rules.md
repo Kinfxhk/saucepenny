@@ -1,4 +1,4 @@
-# Calculation rules (rules version 2)
+# Calculation rules (rules version 3)
 
 Saucepenny follows these rules exactly. They are ordinary kitchen bookkeeping, written in
 our own words. Every number is an exact fraction inside the program; rounding happens
@@ -87,6 +87,37 @@ our own words. Every number is an exact fraction inside the program; rounding ha
     price, shown only when the pack is the same (otherwise "pack changed"), and checked
     against new ÷ old − 1. The price change impact tool (rule 11) can start from any
     kept old price.
+16. **Menu engineering (v0.3):** for a period you choose, enter how many portions of each
+    menu item were sold (whole numbers 0 to 1,000,000,000; a sales CSV may repeat an item,
+    and its rows are added together). Only items with a verified cost and a price above 0
+    take part; the others are listed as left out. For each item:
+    - **margin** = price without service charge − cost per portion (the gross profit of
+      rule 9);
+    - **share of sales** = sold ÷ total sold of the items taking part;
+    - **popular** when share of sales ≥ 70% of an equal share, i.e. ≥ 0.7 ÷ number of
+      items;
+    - **high margin** when margin ≥ the sales-weighted average margin
+      (Σ margin × sold ÷ total sold).
+
+    Boundaries count as popular / high margin. Popular and high margin = **Keep**;
+    popular, low margin = **Raise margin**; high margin, less popular = **Promote**;
+    neither = **Rethink**. With no sales at all, no groups are given. The checker decides
+    the same groups without division: popular when 10 × items × sold ≥ 7 × total sold, and
+    high margin when margin × total sold ≥ Σ margin × sold. Sales counts are not saved in
+    the project.
+
+17. **Supplier price lists (v0.3):** a CSV with name, pack qty, unit and price (price date
+    optional) is read with the same rules as the ingredient import. Each row is matched to
+    an existing ingredient — first by a match remembered on this device from an earlier
+    import, then by identical name (Unicode-normalised, ignoring case and extra spaces;
+    never when two ingredients share the name). The change shown is in the price per base
+    unit (g, ml or piece): price ÷ (pack qty × unit size), compared only when both packs
+    are the same kind of unit, and checked against new price × old pack ÷ (old price × new
+    pack) − 1. Applying a row sets the price, pack qty and unit, keeps the old price in the
+    history (rule 15; a 0 or empty old price is not kept), and dates the new price with
+    the row's date or today. A row with the same price and pack (12 and 12.0 are the
+    same) changes nothing. Two rows for one ingredient are refused, and the whole result
+    is validated before it replaces the project.
 
 ## Number input
 
@@ -106,13 +137,14 @@ densities stay decimal.
 ## Independent check
 
 A separate checker recomputes every displayed recipe total, line cost, cost per portion,
-food cost %, suggested price, labour, overhead, full cost, recipe weight and price change
-by a different method (it expands every dish into raw ingredient packs first, then prices
+food cost %, suggested price, labour, overhead, full cost, recipe weight, price change and
+menu engineering group by a different method (it expands every dish into raw ingredient packs first, then prices
 them). A number is shown only if both agree exactly.
 
 An independent Python program (`tools/oracle/oracle.py`, standard library only) also
 re-derives number parsing, fractions, unit conversion, recipe and menu costing,
-labour/overhead, weights and price changes from these rules for many thousands of random
-cases, in CI on Linux and Windows.
+labour/overhead, weights, price changes, menu engineering groups, sales CSV reading and
+supplier price-list changes from these rules for many thousands of random cases, in CI on
+Linux and Windows.
 
 Units and their legal or standards sources: [units.md](units.md).
