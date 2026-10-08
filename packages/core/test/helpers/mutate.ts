@@ -18,6 +18,8 @@ export interface Mutant {
   file: string; // e.g. 'units/table.ts'
   from: string;
   to: string;
+  /** extra source added after the imports of the mutated file (e.g. a helper import) */
+  prepend?: string;
 }
 
 /** Number of times `from` occurs in the original file (must be exactly 1). */
@@ -34,7 +36,9 @@ export async function loadMutant<T>(m: Mutant): Promise<T> {
   const text = readFileSync(target, 'utf8');
   if (text.split(m.from).length - 1 !== 1)
     throw new Error(`mutant "${m.name}" does not apply once`);
-  writeFileSync(target, text.replace(m.from, m.to));
+  let out = text.replace(m.from, m.to);
+  if (m.prepend) out = out.replace(/^(\/\/ SPDX[^\n]*\n)/, `$1${m.prepend}\n`);
+  writeFileSync(target, out);
   return (await import(pathToFileURL(join(dir, 'index.ts')).href)) as T;
 }
 

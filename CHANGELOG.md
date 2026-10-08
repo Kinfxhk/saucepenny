@@ -15,3 +15,7 @@ All notable changes to Saucepenny are documented here. The format follows
 - Project data model (ingredients with yield %, density and weight per piece; recipes with
   nested sub-recipes; menu items; custom measures), strict validation with paths, limits,
   migration defaults, and hostile-JSON defences (size, depth, prototype keys).
+- Costing engine (recursive, memoised) and an independent checker that expands every
+  recipe into raw ingredient packs; numbers are shown only when both agree exactly.
+  Tarjan cycle detection with the full cycle path, nesting limit of 20 levels.
+- Written calculation rules (docs/calculation-rules.md).
