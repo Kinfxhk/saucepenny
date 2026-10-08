@@ -6,6 +6,10 @@ All notable changes to Saucepenny are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-08
+
+First public release.
+
 - Repository skeleton, licence and notices, cross-platform checks, Linux + Windows CI.
 - Exact BigInt rational numbers, strict decimal parser (full-width digits, thousands
   commas), display rounding and suggested-price rounding (to 0.1, 0.5, 1 or ending in 8).
@@ -35,3 +39,6 @@ All notable changes to Saucepenny are documented here. The format follows
   multiplication); editing one line in a 1,000-ingredient × 500-recipe project updates in
   about 20 ms in headless Chrome.
 - Written calculation rules (docs/calculation-rules.md).
+- Three worked examples (cha chaan teng, home bakery, social-enterprise lunch) checked
+  by the test suite, user guides in English and Traditional Chinese whose excerpts and
+  commands are tested, and release instructions (docs/RELEASING.md).

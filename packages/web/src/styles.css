@@ -120,13 +120,6 @@ a {
   gap: 0.4rem;
   align-items: center;
 }
-.dev-banner {
-  margin: 0;
-  padding: 0.4rem 1.5rem;
-  background: var(--watch-bg);
-  color: var(--watch);
-  font-weight: 600;
-}
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -369,8 +362,7 @@ td[data-band='high'] {
   .top,
   .tabs,
   main,
-  .skip,
-  .dev-banner {
+  .skip {
     display: none !important;
   }
   .print-area {
