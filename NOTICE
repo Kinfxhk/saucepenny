@@ -1,0 +1,24 @@
+Saucepenny (菜本易)
+Copyright (C) 2026 Saucepenny contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See the LICENSE file for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+Saucepenny produces estimates only. Results depend entirely on the prices,
+yields and quantities that you enter. It is not accounting, tax or legal
+advice. It does not calculate nutrition or allergens.
+
+Unit constants are cited from the Hong Kong Weights and Measures Ordinance
+(Cap. 68) and NIST Handbook 44, Appendix C; see docs/units.md.
+
+Saucepenny is an independent project. It is not affiliated with, endorsed by,
+or sponsored by any other recipe-costing product or company. All product names
+are trademarks of their respective owners.
+
+Third-party components and their notices are listed in THIRD_PARTY_NOTICES.md.

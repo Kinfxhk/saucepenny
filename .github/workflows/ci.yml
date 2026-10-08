@@ -1,0 +1,164 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+
+jobs:
+  check:
+    # Every milestone must be green on Linux AND Windows (and on Node 22 and 24).
+    name: check (${{ matrix.os }}, node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history for the secret scan
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check (LF checkout via .gitattributes)
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit, property, oracle, mutation and golden tests
+        run: npm test
+
+      - name: Core tests under other time zones and locales (results must not change)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          TZ=America/New_York LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 npx vitest run packages/core/test
+          TZ=Asia/Tokyo LANG=fr_FR.UTF-8 npx vitest run packages/core/test
+
+      - name: Dependency licence check (AGPL-3.0 compatible allowlist, fails closed)
+        run: npm run check:licenses
+
+      - name: Repository hygiene
+        run: npm run check:hygiene
+
+      - name: Install gitleaks (Linux; pinned, retried download, SHA-256 verified)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run fetch:gitleaks
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf "${tarball}" gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm -f "${tarball}"
+
+      - name: Secret scan (gitleaks on Linux; clearly labelled FALLBACK on Windows)
+        run: npm run check:secrets
+
+      - name: Build the static site and package it reproducibly (two builds, same SHA-256)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run package:site
+          first=$(cut -d' ' -f1 release/saucepenny-site-v*.zip.sha256)
+          npm run build
+          npm run package:site
+          second=$(cut -d' ' -f1 release/saucepenny-site-v*.zip.sha256)
+          echo "first: $first"
+          echo "second: $second"
+          test "$first" = "$second"
+
+  e2e:
+    # Headless browser tests (Chromium) on Linux AND Windows, including typing Traditional
+    # Chinese names, offline reload, zero external requests, no console/CSP errors, axe.
+    name: e2e (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium (Linux, with system libraries)
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+      - name: Install Chromium (Windows)
+        if: runner.os == 'Windows'
+        run: npx playwright install chromium
+      - name: Build and run the browser tests
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-${{ matrix.os }}
+          path: test-results/
+          retention-days: 7
+
+  docker:
+    # The container only serves the static site; check it builds and answers /healthz.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build container image
+        run: docker build --pull -t saucepenny:ci .
+
+      - name: Run container and wait for the health endpoint
+        run: |
+          set -euo pipefail
+          docker run -d --name saucepenny-ci -p 127.0.0.1:4893:4893 saucepenny:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4893/healthz; then
+              echo "Container is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Container did not become healthy in time." >&2
+          docker logs saucepenny-ci >&2
+          exit 1
+
+      - name: Home page, service worker and licence are served (HTTP 200)
+        run: |
+          set -euo pipefail
+          for path in / /sw.js /manifest.webmanifest /licenses/Saucepenny-LICENSE.txt; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:4893${path}")
+            echo "${path}: HTTP $code"
+            test "$code" = 200
+          done
+          curl -fsS http://127.0.0.1:4893/ | grep -q 'id="source-link"'
+
+      - name: Container logs
+        if: always()
+        run: docker logs saucepenny-ci || true

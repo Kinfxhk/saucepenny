@@ -1,0 +1,11 @@
+{
+  "name": "Saucepenny · 菜本易",
+  "short_name": "Saucepenny",
+  "description": "Free, offline recipe costing and menu pricing with exact arithmetic.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf6ef",
+  "theme_color": "#7a3b1e",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

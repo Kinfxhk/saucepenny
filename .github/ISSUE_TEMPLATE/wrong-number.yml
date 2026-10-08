@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Wrong number
+description: Saucepenny showed a cost, percentage or price that you believe is wrong.
+title: 'Wrong number: '
+labels: ['wrong number']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Every wrong number we fix gets a regression test, so it stays fixed.
+        Please use invented prices (not a real supplier's price list) and remove anything
+        commercially sensitive. Exporting a small project file (JSON) that shows the
+        problem helps most.
+  - type: textarea
+    id: input
+    attributes:
+      label: Ingredients and recipe (or attach a small project JSON)
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: shown
+    attributes:
+      label: What Saucepenny showed
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and your working
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the page footer, for example v0.1.0.
+      placeholder: v0.1.0

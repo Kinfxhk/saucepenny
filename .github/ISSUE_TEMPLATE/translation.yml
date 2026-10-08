@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Translation
+description: Fix a translation or offer a new language.
+title: 'Translation: '
+labels: ['translation']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        UI strings are in packages/web/src/strings.ts and engine messages in
+        packages/core/src/i18n/. Every translation must be your own writing.
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: Traditional Chinese (Hong Kong)
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Quote the current text and your suggestion.
+    validations:
+      required: true

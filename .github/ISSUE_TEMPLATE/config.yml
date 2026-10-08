@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem or code-of-conduct report
+    url: https://github.com/Kinfxhk/saucepenny/security/advisories/new
+    about: Report privately; only the maintainers can see it.

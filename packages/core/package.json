@@ -1,0 +1,12 @@
+{
+  "name": "@saucepenny/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Saucepenny core: exact rational numbers, units, data model, costing engine, independent checker, CSV/JSON I/O. Pure functions, zero runtime dependencies.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts"
+}

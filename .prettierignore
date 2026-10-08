@@ -1,0 +1,12 @@
+LICENSE
+CODE_OF_CONDUCT.md
+node_modules
+dist
+coverage
+release
+package-lock.json
+**/__snapshots__/**
+test-results
+playwright-report
+test/scripts/fixtures
+packages/core/src/*-mutant-*
