@@ -2,3 +2,4 @@
 export * from './rational';
 export * from './decimal';
 export * from './round';
+export * from './quantity';

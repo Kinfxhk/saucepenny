@@ -64,7 +64,7 @@ export function projectArb(opts: RandomOptions = {}): fc.Arbitrary<StoredProject
       const yieldKinds: string[] = [];
       const p: StoredProject = {
         schema: 'saucepenny/project',
-        version: 1,
+        version: 2,
         name: 'Random',
         settings: {
           currency: 'HKD',

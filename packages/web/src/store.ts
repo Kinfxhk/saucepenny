@@ -1,17 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Local storage: the project lives in IndexedDB in this browser only. Small display
-// settings live in localStorage. "Delete all data" removes both.
+// settings and the backup reminder state live in localStorage. "Delete all data" removes both.
+
+import { readBackupState, type BackupState } from './storage-guard';
 
 const DB = 'saucepenny';
 const STORE = 'kv';
 const KEY = 'current';
 export const SETTINGS_KEY = 'saucepenny-settings';
+/** When the last backup file was saved and how many changes since (v0.2). */
+export const BACKUP_KEY = 'saucepenny-backup';
+
+let cached: IDBDatabase | undefined;
 
 function openDb(): Promise<IDBDatabase> {
+  if (cached) return Promise.resolve(cached);
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      cached = req.result;
+      // Another tab deleting or upgrading the database: let go of it.
+      cached.onversionchange = () => {
+        cached?.close();
+        cached = undefined;
+      };
+      resolve(cached);
+    };
     req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
   });
 }
@@ -21,10 +36,7 @@ export async function loadState(): Promise<unknown> {
     const db = await openDb();
     return await new Promise((resolve, reject) => {
       const req = db.transaction(STORE).objectStore(STORE).get(KEY);
-      req.onsuccess = () => {
-        resolve(req.result);
-        db.close();
-      };
+      req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error ?? new Error('IndexedDB read failed'));
     });
   } catch {
@@ -32,29 +44,33 @@ export async function loadState(): Promise<unknown> {
   }
 }
 
-export async function saveState(value: unknown): Promise<void> {
-  try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
+/** Write the project. With the database already open, the write starts synchronously,
+ * so a save started while the page is being closed still goes through. */
+export function saveState(value: unknown): Promise<void> {
+  const write = (db: IDBDatabase) =>
+    new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(value, KEY);
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
+      tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error ?? new Error('IndexedDB write failed'));
     });
+  try {
+    const p = cached ? write(cached) : openDb().then(write);
+    return p.catch(() => undefined); // storage is best effort; the page keeps working
   } catch {
-    // Storage is best effort; the page keeps working without it.
+    return Promise.resolve();
   }
 }
 
 export async function wipeAll(): Promise<void> {
   try {
     localStorage.removeItem(SETTINGS_KEY);
+    localStorage.removeItem(BACKUP_KEY);
   } catch {
     /* ignore */
   }
+  cached?.close();
+  cached = undefined;
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase(DB);
     req.onsuccess = req.onerror = req.onblocked = () => resolve();
@@ -80,6 +96,22 @@ export function loadSettings(): Settings {
 export function saveSettings(s: Settings): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadBackupState(): BackupState {
+  try {
+    return readBackupState(JSON.parse(localStorage.getItem(BACKUP_KEY) ?? 'null'));
+  } catch {
+    return readBackupState(null);
+  }
+}
+
+export function saveBackupState(s: BackupState): void {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(s));
   } catch {
     /* ignore */
   }

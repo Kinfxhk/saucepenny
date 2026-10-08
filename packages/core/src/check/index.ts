@@ -137,8 +137,13 @@ export class Checker {
     { packs: Map<string, Rational>; height: number } | CheckFailure
   >();
 
-  private batchPacks(id: string): Map<string, Rational> | CheckFailure {
-    let entry = this.batchMemo.get(id);
+  /**
+   * `physical` = the packs really used (for "how much can I make"); otherwise the packs
+   * that are *paid for* in the cost, i.e. each line weighted by its counted share.
+   */
+  private batchPacks(id: string, physical = false): Map<string, Rational> | CheckFailure {
+    const key = `${physical ? 'p' : 'c'}:${id}`;
+    let entry = this.batchMemo.get(key);
     if (!entry) {
       const recipe = this.project.recipes.get(id)!;
       const packs = new Map<string, Rational>();
@@ -146,16 +151,17 @@ export class Checker {
       entry = { packs, height };
       for (let j = 0; j < recipe.lines.length; j++) {
         const line = recipe.lines[j]!;
+        if (!physical && line.share.n === 0n) continue; // a pinch, not costed
         if (line.ref.kind === 'recipe') {
-          const childPacks = this.batchPacks(line.ref.id);
+          const childPacks = this.batchPacks(line.ref.id, physical);
           if (typeof childPacks === 'string') {
             entry = childPacks;
             break;
           }
-          const ch = this.batchMemo.get(line.ref.id);
+          const ch = this.batchMemo.get(`${physical ? 'p' : 'c'}:${line.ref.id}`);
           if (ch && typeof ch !== 'string') height = Math.max(height, ch.height + 1);
         }
-        const err = this.lineInto(recipe, j, rat(1n), packs);
+        const err = this.lineInto(recipe, j, rat(1n), packs, undefined, physical);
         if (err) {
           entry = err;
           break;
@@ -163,7 +169,7 @@ export class Checker {
       }
       if (typeof entry !== 'string') entry = { packs, height };
       if (typeof entry !== 'string' && height > LIMITS.nestingDepth) entry = 'too-deep';
-      this.batchMemo.set(id, entry);
+      this.batchMemo.set(key, entry);
     }
     return typeof entry === 'string' ? entry : entry.packs;
   }
@@ -179,8 +185,13 @@ export class Checker {
     batches: Rational,
     packs: Map<string, Rational>,
     moneyInto?: { total: Rational },
+    physical = false,
   ): CheckFailure | undefined {
     const line = recipe.lines[j]!;
+    if (!physical) {
+      if (line.share.n === 0n) return undefined; // a pinch, not costed
+      batches = mul(batches, line.share); // pay for this share of the line only
+    }
     const from = scaleOf(line.unit, this.project.measures);
     const keep = sub(rat(1n), line.waste);
     if (line.ref.kind === 'ingredient') {
@@ -213,7 +224,7 @@ export class Checker {
       moneyInto.total = add(moneyInto.total, mul(money, childBatches));
       return undefined;
     }
-    const childPacks = this.batchPacks(child.id);
+    const childPacks = this.batchPacks(child.id, physical);
     if (typeof childPacks === 'string') return childPacks;
     for (const [id, n] of childPacks)
       packs.set(id, add(packs.get(id) ?? ZERO, mul(n, childBatches)));
@@ -244,10 +255,14 @@ export class Checker {
    * Raw ingredient packs for `units` yield units of a recipe (used for "price change
    * impact" and for checking the whole menu).
    */
-  packsFor(recipeId: string, yieldUnits: Rational): Map<string, Rational> | CheckFailure {
+  packsFor(
+    recipeId: string,
+    yieldUnits: Rational,
+    physical = false,
+  ): Map<string, Rational> | CheckFailure {
     if (this.touchesCycle(recipeId)) return 'cycle';
     const r = this.project.recipes.get(recipeId)!;
-    const batch = this.batchPacks(recipeId);
+    const batch = this.batchPacks(recipeId, physical);
     if (typeof batch === 'string') return batch;
     const batches = div(yieldUnits, r.yieldQty);
     return new Map([...batch].map(([id, n]) => [id, mul(n, batches)]));
@@ -310,6 +325,43 @@ export class Checker {
     if (!units) return 'units';
     return mul(units, rec.perYieldUnit);
   }
+}
+
+/**
+ * Labour and overhead, recomputed another way: everything is first put over 60 (per-minute
+ * money) and summed, then the food share is added; no shared code with cost/extras.
+ */
+export function recomputeExtras(
+  r: Recipe,
+  food: Rational,
+): { labour: Rational; overhead: Rational; full: Rational } {
+  const e = r.extras;
+  const labour = div(mul(e.labourRate, e.labourMinutes), rat(60n));
+  const overheadOnFood = div(mul(food, mul(e.overheadRate, rat(100n))), rat(100n));
+  const overhead = add(overheadOnFood, e.overheadFixed);
+  return { labour, overhead, full: add(add(labour, overhead), food) };
+}
+
+/** Ingredient weight in grams of one batch (lines as entered), or the lines it cannot weigh. */
+export function recomputeWeight(
+  project: Project,
+  r: Recipe,
+): { grams: Rational } | { missing: number[] } {
+  const gram: Scale = { kind: 'mass', size: rat(1n) };
+  const missing: number[] = [];
+  let grams = ZERO;
+  for (let j = 0; j < r.lines.length; j++) {
+    const l = r.lines[j]!;
+    const from = scaleOf(l.unit, project.measures);
+    let g: Rational | undefined;
+    if (l.ref.kind === 'ingredient') {
+      const ing = project.ingredients.get(l.ref.id)!;
+      g = amountIn(l.qty, from, gram, ing.density, ing.pieceWeight);
+    } else g = amountIn(l.qty, from, gram, project.recipes.get(l.ref.id)!.density);
+    if (g === undefined) missing.push(j);
+    else grams = add(grams, g);
+  }
+  return missing.length ? { missing } : { grams };
 }
 
 export const sameNumber = eq;

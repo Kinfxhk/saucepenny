@@ -1,7 +1,7 @@
 {
   "name": "saucepenny-monorepo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Saucepenny (菜本易): free, offline, open-source recipe costing and menu pricing. Exact arithmetic; every number re-checked by an independent checker.",
   "license": "AGPL-3.0-or-later",
   "homepage": "https://kinfxhk.github.io/saucepenny/",
@@ -31,6 +31,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "oracle": "python3 tools/oracle/oracle.py",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",

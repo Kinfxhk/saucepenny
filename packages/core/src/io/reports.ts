@@ -4,7 +4,7 @@
 // table, CSV exports and the plain-text report the CLI prints. The web UI renders the same
 // structures, so the CLI and the UI show identical text for identical projects.
 
-import { verifiedImpact, verifiedProject, type VerifiedProject } from '../api';
+import { verifiedImpact, verifiedProject, verifiedWeight, type VerifiedProject } from '../api';
 import { describeError, type Lang } from '../i18n/index';
 import type { Project, UnitRef } from '../model/index';
 import {
@@ -50,6 +50,14 @@ const T = {
     noImpact: 'Nothing changes.',
     rounding:
       'Each amount is rounded to the cent on its own; rounded lines may not add up exactly.',
+    labour: 'labour',
+    overhead: 'overhead',
+    fullCost: 'full cost (food + labour + overhead)',
+    weight: 'ingredient weight',
+    perPortion: 'per portion',
+    noWeight: 'cannot weigh',
+    notCosted: 'pinch, not costed',
+    countedAt: 'cost counted at {pct}',
   },
   'zh-HK': {
     disclaimer: '只供估算，並非會計或稅務意見。',
@@ -80,6 +88,14 @@ const T = {
     impact: '價格變動',
     noImpact: '沒有任何改變。',
     rounding: '每個金額各自四捨五入至仙，各行相加可能與總數相差一兩仙。',
+    labour: '人工',
+    overhead: '雜費',
+    fullCost: '全部成本（食材＋人工＋雜費）',
+    weight: '材料總重',
+    perPortion: '每份',
+    noWeight: '無法計重',
+    notCosted: '少量，不計成本',
+    countedAt: '成本按 {pct} 計',
   },
 } as const;
 
@@ -108,6 +124,8 @@ export interface CardLine {
   waste: string;
   cost: string;
   share: string;
+  /** '' when the whole cost is counted; otherwise "pinch, not costed" or "counted at 50%" */
+  counted: string;
 }
 export interface RecipeCard {
   id: string;
@@ -119,7 +137,16 @@ export interface RecipeCard {
   perUnitLabel: string;
   lines: CardLine[];
   problem: string | null;
+  /** labour and overhead (v0.2), null when none is entered or numbers are withheld */
+  extras: { labour: string; overhead: string; full: string; fullPerUnit: string } | null;
+  /** ingredient weight of one batch (v0.2) */
+  weight:
+    | { status: 'ok'; total: string; perPortion: string | null }
+    | { status: 'missing'; lines: string[] }
+    | null;
 }
+
+const grams = (g: Rational) => `${formatQuantity(g)} g`;
 
 export function recipeCard(
   project: Project,
@@ -146,10 +173,37 @@ export function recipeCard(
       waste: l.waste.n === 0n ? '' : pct(l.waste),
       cost: cost ? formatMoney(cost) : '',
       share: cost && ok && ok.total.n !== 0n ? pct(div(cost, ok.total)) : '',
+      counted:
+        l.share.n === l.share.d
+          ? ''
+          : l.share.n === 0n
+            ? T[lang].notCosted
+            : T[lang].countedAt.replace('{pct}', pct(l.share)),
     };
   });
+  const vw = verifiedWeight(project, id);
+  const weight: RecipeCard['weight'] =
+    vw.status === 'ok'
+      ? {
+          status: 'ok',
+          total: grams(vw.grams),
+          perPortion: vw.perPortion ? grams(vw.perPortion) : null,
+        }
+      : vw.status === 'missing'
+        ? { status: 'missing', lines: vw.lines.map((j) => lines[j]!.name) }
+        : null;
   return {
     id,
+    weight,
+    extras:
+      ok && ok.extras
+        ? {
+            labour: formatMoney(ok.extras.labour),
+            overhead: formatMoney(ok.extras.overhead),
+            full: formatMoney(ok.extras.full),
+            fullPerUnit: formatUnitMoney(ok.extras.fullPerYieldUnit),
+          }
+        : null,
     name: r.name,
     yieldText: `${formatQuantity(r.yieldQty)} ${yieldUnitText}`,
     total: ok ? formatMoney(ok.total) : null,
@@ -229,7 +283,17 @@ export function recipesCsv(
   for (const id of project.recipes.keys()) {
     const c = recipeCard(project, v, id, lang);
     for (const l of c.lines)
-      rows.push([c.name, c.yieldText, l.name, l.qty, l.unit, l.waste, l.cost, l.share, '']);
+      rows.push([
+        c.name,
+        c.yieldText,
+        l.counted ? `${l.name} (${l.counted})` : l.name,
+        l.qty,
+        l.unit,
+        l.waste,
+        l.cost,
+        l.share,
+        '',
+      ]);
     rows.push([
       c.name,
       c.yieldText,
@@ -241,6 +305,13 @@ export function recipesCsv(
       c.total ? '100.0%' : '',
       c.problem ?? '',
     ]);
+    if (c.extras)
+      for (const [label, value] of [
+        [t.labour, c.extras.labour],
+        [t.overhead, c.extras.overhead],
+        [t.fullCost, c.extras.full],
+      ] as const)
+        rows.push([c.name, c.yieldText, label, '', '', '', value, '', '']);
   }
   rows.push([t.disclaimer]);
   return toCsv(rows, { bom: true });
@@ -328,11 +399,19 @@ export function textReport(
     }
     for (const l of c.lines)
       out.push(
-        `  ${l.isRecipe ? '↳ ' : ''}${l.name}  ${l.qty} ${l.unit}${l.waste ? ` (+${l.waste} ${t.waste})` : ''}  ${l.cost}  ${l.share}`,
+        `  ${l.isRecipe ? '↳ ' : ''}${l.name}  ${l.qty} ${l.unit}${l.waste ? ` (+${l.waste} ${t.waste})` : ''}${l.counted ? ` [${l.counted}]` : ''}  ${l.cost}  ${l.share}`,
       );
     out.push(
       `  ${t.total} ${c.total} · ${t.per}${lang === 'en' ? ' ' : ''}${c.perUnitLabel} ${c.perUnit}`,
     );
+    if (c.extras)
+      out.push(
+        `  ${t.labour} ${c.extras.labour} · ${t.overhead} ${c.extras.overhead} · ${t.fullCost} ${c.extras.full} · ${t.per}${lang === 'en' ? ' ' : ''}${c.perUnitLabel} ${c.extras.fullPerUnit}`,
+      );
+    if (c.weight?.status === 'ok')
+      out.push(
+        `  ${t.weight} ${c.weight.total}${c.weight.perPortion ? ` · ${t.perPortion} ${c.weight.perPortion}` : ''}`,
+      );
   }
   out.push('', `== ${t.menu} ==`);
   for (const r of menuRows(project, v, lang)) {

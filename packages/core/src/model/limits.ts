@@ -7,6 +7,8 @@ export const LIMITS = Object.freeze({
   nestingDepth: 20,
   menuItems: 1000,
   measures: 50,
+  /** earlier prices kept per ingredient */
+  priceHistory: 50,
   nameLength: 200,
   noteLength: 2000,
   idLength: 64,

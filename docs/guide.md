@@ -40,6 +40,11 @@ shoulder for $62, a 410 g can of evaporated milk for $11.50 or 30 eggs for $48.
 - **Real cost** shows the usable cost per kg, per litre or per piece.
 
 Numbers may be typed with full-width digits (１２．５) and thousands commas (1,250).
+Quantities (not prices) may also be fractions: `1/2`, `1 1/2`, `½` or `1½`.
+
+**Price history:** when you change a price or a pack, the old price, pack and date are
+kept (up to 50). The ingredient shows the change, for example "↑ 12.9% since 2026-09-01",
+when the pack is the same. Old prices are listed in the **Price change** tab.
 
 You can import a list with **Import CSV**. The first row names the columns, in English
 or Chinese: `name, pack qty, unit, price, yield %, density g/ml, piece weight g, price
@@ -61,6 +66,19 @@ so a 叉燒飯 can use 叉燒, which uses 叉燒醬, which uses 糖水.
 - **Scale** shows every amount and the cost for a different batch size.
 - **How much can I make?** tells you how much of the recipe an amount of one ingredient
   allows (through sub-recipes too).
+
+- **Cost %** on a line is how much of its cost is counted (default 100%). Set it to 0%
+  for a pinch of salt or a few spring onions you do not want to cost (少量): the line
+  then needs no unit conversion and reports mark it "pinch, not costed".
+- **Duplicate recipe** makes a copy to turn into a variation.
+- **Ingredient weight** adds up every line in grams as entered (before waste), and per
+  portion when the recipe yields portions. Lines in volume or pieces need a density or a
+  weight per piece; otherwise they are listed.
+- **Labour and overhead (optional):** minutes of work per batch × cost per hour, plus a
+  fixed overhead per batch and/or a % of the food cost. Saucepenny shows the **full
+  cost** of a batch and per yield unit. Example: 45 minutes at $72 an hour is $54 of
+  labour; with $10 fixed and 10% overhead on a $200 food cost, the full cost is
+  $200 + $54 + $30 = $284. The food cost % on the menu does not include these.
 
 If recipes use each other in a circle (A uses B, B uses A), Saucepenny names the whole
 circle and refuses to give a number. Sub-recipes can be nested up to 20 levels.
@@ -110,7 +128,9 @@ for an extra topping, or 250 ml of soup).
 
 **Price change** shows what happens if one ingredient's pack price changes: every recipe
 and menu item whose cost changes is listed with before, after and the difference,
-including those that use it only through a sub-recipe.
+including those that use it only through a sub-recipe. Below it, **Earlier prices of
+this ingredient** lists kept old prices; **Try this price** starts the calculation from
+one of them.
 
 <!-- doc-test: impact examples/cha-chaan-teng.json pork-shoulder 70 -->
 
@@ -128,6 +148,13 @@ Menu item · 加叉燒 Extra char siu: 9.33 → 10.47 (+1.14)
 - **Print cost cards** prints the menu table and one card per recipe.
 - Your project is saved only in this browser (IndexedDB). **Delete all data on this
   device** removes it and your settings.
+- **Storage on this device** (Data tab) shows whether the browser agreed to keep the data
+  even when space runs low; **Ask the browser again** repeats the request. Browsers may
+  still clear site data, so keep backup files.
+- After 20 changes or 14 days without a backup, a reminder offers **Save backup (.json)**;
+  **Not now** hides it for 7 days. It never uses the network.
+- **Custom measures** (Data tab): add your own measures, such as a scoop of 40 g or a
+  bowl of 300 ml, and use them in recipe lines. A measure in use cannot be removed.
 
 ## 7. Command line
 

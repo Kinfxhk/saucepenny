@@ -314,6 +314,28 @@ details.tool summary {
   background: var(--warn-bg);
   border-radius: 0.4rem;
 }
+.reminder {
+  margin: 0.75rem 0;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.reminder[hidden] {
+  display: none;
+}
+#persist-status[data-status='not-persisted'],
+#persist-status[data-status='unsupported'] {
+  color: var(--warn);
+}
+#extras-table th {
+  text-align: left;
+  font-weight: normal;
+  padding-right: 1rem;
+}
 .problems-title {
   margin: 0;
   font-weight: 700;

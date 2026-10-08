@@ -58,6 +58,13 @@ jobs:
           TZ=America/New_York LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 npx vitest run packages/core/test
           TZ=Asia/Tokyo LANG=fr_FR.UTF-8 npx vitest run packages/core/test
 
+      - name: Independent Python oracle (exact cross-check of parsing, units, costing, pricing)
+        shell: bash
+        run: |
+          PY="$(command -v python3 || command -v python)"
+          "$PY" --version
+          "$PY" tools/oracle/oracle.py
+
       - name: Dependency licence check (AGPL-3.0 compatible allowlist, fails closed)
         run: npm run check:licenses
 

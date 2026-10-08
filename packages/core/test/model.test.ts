@@ -244,7 +244,7 @@ describe('hostile JSON files', () => {
     expect(codes(readProjectJson('[]'))).toEqual(['not-a-project@']);
     expect(codes(readProjectJson('{"schema":"other"}'))).toEqual(['not-a-project@']);
     const newer = clone(sampleStored()) as unknown as Record<string, unknown>;
-    newer.version = 2;
+    newer.version = 3;
     expect(codes(validateProject(newer))).toEqual(['newer-version@version']);
     newer.version = 0;
     expect(codes(validateProject(newer))).toEqual(['unsupported-version@version']);

@@ -9,7 +9,7 @@ export function bigProject(nIng = 1000, nRec = 500, nMenu = 300): StoredProject 
   const units = ['g', 'kg', 'catty', 'tael', 'lb', 'ml', 'l', 'piece'] as const;
   const p: StoredProject = {
     schema: 'saucepenny/project',
-    version: 1,
+    version: 2,
     name: 'benchmark',
     settings: {
       currency: 'HKD',

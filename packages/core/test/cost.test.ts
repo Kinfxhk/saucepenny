@@ -433,23 +433,23 @@ const ENGINE_MUTANTS: Mutant[] = [
   {
     name: 'each line rounded to the cent before adding',
     file: 'cost/engine.ts',
-    from: 'const cost = div(mul(qtyBase, unitCost), sub(ONE, line.waste));',
-    to: 'const cost = rat(ceilInt(mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), rat(100n))), 100n);',
+    from: 'const cost = mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), line.share);',
+    to: 'const cost = rat(ceilInt(mul(mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), line.share), rat(100n))), 100n);',
     prepend: "import { ceilInt } from '../num/index';",
   },
   {
     name: 'binary floating point instead of exact',
     file: 'cost/engine.ts',
-    from: 'const cost = div(mul(qtyBase, unitCost), sub(ONE, line.waste));',
-    to: 'const cost = toFloatRat(div(mul(qtyBase, unitCost), sub(ONE, line.waste)));',
+    from: 'const cost = mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), line.share);',
+    to: 'const cost = toFloatRat(mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), line.share));',
     prepend:
       'const toFloatRat = (r: { n: bigint; d: bigint }) => rat(BigInt(Math.round((Number(r.n) / Number(r.d)) * 1e9)), 10n ** 9n);',
   },
   {
     name: 'waste added instead of divided',
     file: 'cost/engine.ts',
-    from: 'const cost = div(mul(qtyBase, unitCost), sub(ONE, line.waste));',
-    to: 'const cost = mul(mul(qtyBase, unitCost), add(ONE, line.waste));',
+    from: 'const cost = mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), line.share);',
+    to: 'const cost = mul(mul(mul(qtyBase, unitCost), add(ONE, line.waste)), line.share);',
   },
   {
     name: 'unit conversion direction reversed',

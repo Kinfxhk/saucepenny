@@ -28,7 +28,16 @@ import {
   menuCsv,
   menuRows,
   normaliseDecimalInput,
+  normaliseQuantityInput,
   parseDecimal,
+  parseQuantity,
+  duplicateRecipe,
+  measureUses,
+  recordPriceChange,
+  verifiedPriceChange,
+  formatPercent,
+  eq,
+  type PriceSnapshot,
   PRICE_ROUNDINGS,
   readProjectJson,
   recipeCard,
@@ -49,7 +58,24 @@ import {
 import sampleText from '../../../examples/cha-chaan-teng.json?raw';
 import { byId, download, fileName, h } from './dom';
 import { printCards } from './print';
-import { loadSettings, loadState, saveSettings, saveState, wipeAll, type Settings } from './store';
+import {
+  loadBackupState,
+  loadSettings,
+  loadState,
+  saveBackupState,
+  saveSettings,
+  saveState,
+  wipeAll,
+  type Settings,
+} from './store';
+import {
+  ensurePersisted,
+  noteBackup,
+  noteChange,
+  reminderDue,
+  snooze,
+  type PersistStatus,
+} from './storage-guard';
 import { ui, type UiKey } from './strings';
 import './styles.css';
 
@@ -77,6 +103,11 @@ let canIngredient = '';
 let canQty = '';
 let canUnit: UnitRef = 'kg';
 let note = '';
+let persistStatus: PersistStatus | 'checking' = 'checking';
+let persistAsked = false;
+let backup = loadBackupState();
+/** Price and pack of each ingredient as last shown, to keep the old price on a change. */
+const priceSnap = new Map<string, PriceSnapshot>();
 let noteList: string[] = [];
 
 const T = (key: UiKey, params: Record<string, string | number> = {}) => ui(lang, key, params);
@@ -113,9 +144,122 @@ function verifyForTab(): VerifiedProject | null {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let savePending = false;
+let pendingSince = 0;
+/** Save 250 ms after typing stops, but at least once a second while typing goes on. */
 function persist(): void {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => void saveState(JSON.parse(stringifyProject(stored))), 250);
+  if (!savePending) pendingSince = Date.now();
+  savePending = true;
+  saveTimer = setTimeout(flushSave, Math.max(0, Math.min(250, pendingSince + 1000 - Date.now())));
+}
+
+/** Write now (also when the page is hidden or closed, so a quick reload loses nothing). */
+function flushSave(): void {
+  clearTimeout(saveTimer);
+  if (!savePending) return;
+  savePending = false;
+  void saveState(JSON.parse(stringifyProject(stored)));
+  backup = noteChange(backup, new Date().toISOString());
+  saveBackupState(backup);
+  updateReminder();
+  void askPersist();
+}
+
+// ---------- keeping data safe (v0.2) ----------
+const hasData = () => stored.ingredients.length + stored.recipes.length + stored.menu.length > 0;
+
+async function askPersist(force = false): Promise<void> {
+  if (persistStatus === 'persisted' || (persistAsked && !force)) return;
+  persistAsked = true;
+  persistStatus = await ensurePersisted(navigator.storage);
+  updatePersistStatus();
+}
+
+function updatePersistStatus(): void {
+  const el = document.getElementById('persist-status');
+  if (!el) return;
+  el.dataset.status = persistStatus;
+  el.textContent = T(`persist.${persistStatus}` as UiKey);
+  const again = document.getElementById('persist-again');
+  if (again) again.hidden = persistStatus !== 'not-persisted';
+}
+
+function backupNow(): void {
+  download(fileName(stored.name, 'json'), stringifyProject(stored), 'application/json');
+  backup = noteBackup(new Date().toISOString());
+  saveBackupState(backup);
+  updateReminder();
+  const last = document.getElementById('last-backup');
+  if (last) last.textContent = T('backup.last', { d: backup.lastAt.slice(0, 10) });
+}
+
+/** The gentle "save a backup" reminder. Dismissible; nothing is sent anywhere. */
+function updateReminder(): void {
+  const box = document.getElementById('reminder');
+  if (!box) return;
+  const due = reminderDue(backup, Date.now(), hasData());
+  box.hidden = !due;
+  if (!due) {
+    box.replaceChildren();
+    return;
+  }
+  box.replaceChildren(
+    h('span', {}, T('backup.reminder', { n: backup.changes })),
+    ' ',
+    h('button', { type: 'button', id: 'reminder-backup', onclick: backupNow }, T('backup.now')),
+    ' ',
+    h(
+      'button',
+      {
+        type: 'button',
+        id: 'reminder-later',
+        onclick: () => {
+          backup = snooze(backup, new Date().toISOString());
+          saveBackupState(backup);
+          updateReminder();
+        },
+      },
+      T('backup.later'),
+    ),
+  );
+}
+
+const todayIso = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Same number typed two ways (12 and 12.0, 1/2 and 0.5)? */
+function sameQty(a: string, b: string): boolean {
+  const x = parseQuantity(a);
+  const y = parseQuantity(b);
+  return x.ok && y.ok ? eq(x.value, y.value) : a === b;
+}
+
+/** After a price or pack edit: keep the previous price in the history (v0.2). */
+function notePriceEdit(ing: StoredIngredient): void {
+  const before = priceSnap.get(ing.id);
+  const now: PriceSnapshot = {
+    price: ing.price,
+    packQty: ing.packQty,
+    packUnit: ing.packUnit,
+    priceDate: ing.priceDate,
+  };
+  if (!before) return void priceSnap.set(ing.id, now);
+  const valid = (x: PriceSnapshot) => parseDecimal(x.price).ok && parseQuantity(x.packQty).ok;
+  if (!valid(before) || !valid(now)) return;
+  const priceBefore = parseDecimal(before.price);
+  if (priceBefore.ok && priceBefore.value.n === 0n) {
+    priceSnap.set(ing.id, now); // 0 is a placeholder, not a price worth keeping
+    return;
+  }
+  const next = recordPriceChange(ing, before, todayIso(), sameQty);
+  if (next !== ing) {
+    Object.assign(ing, next);
+    priceSnap.set(ing.id, { ...now, priceDate: ing.priceDate });
+  }
 }
 
 // ---------- helpers ----------
@@ -178,7 +322,9 @@ function textInput(value: string, key: string, label: string, path: string) {
 }
 
 /** Normalise typed numbers (full-width digits, commas) once the field is left. */
-function tidyNumber(v: string): string {
+function tidyNumber(v: string, quantity = false): string {
+  if (quantity && normaliseQuantityInput(v).includes('/'))
+    return parseQuantity(v).ok ? normaliseQuantityInput(v) : v;
   const r = parseDecimal(v);
   return r.ok ? normaliseDecimalInput(v).replace(/,/g, '') : v;
 }
@@ -206,6 +352,12 @@ const FIELD: Record<string, UiKey> = {
   goodPercent: 'data.good',
   highPercent: 'data.high',
   currency: 'data.currency',
+  amount: 'data.measureAmount',
+  labourMinutes: 'rec.labourMinutes',
+  labourRate: 'rec.labourRate',
+  overheadFixed: 'rec.overheadFixed',
+  overheadPercent: 'rec.overheadPercent',
+  priceHistory: 'impact.history',
 };
 
 /** "recipes[2].lines[0].qty" → "食譜「叉燒」· 第 1 行 · 份量: message" using names. */
@@ -228,7 +380,7 @@ function describeValidation(e: ProjectError): string {
     ingredients: 'tab.ingredients',
     recipes: 'tab.recipes',
     menu: 'tab.menu',
-    measures: 'data.title',
+    measures: 'data.measures',
   }[section!] as UiKey;
   const parts = [`${T(label)}「${name}」`];
   if (line !== undefined)
@@ -322,12 +474,20 @@ function setText(sel: string, text: string, root: ParentNode = document): void {
 
 // ----- ingredients -----
 function renderIngredients(panel: HTMLElement): void {
+  priceSnap.clear();
+  for (const g of stored.ingredients)
+    priceSnap.set(g.id, {
+      price: g.price,
+      packQty: g.packQty,
+      packUnit: g.packUnit,
+      priceDate: g.priceDate,
+    });
   const rows = stored.ingredients
     .map((ing, i) => ({ ing, i }))
     .filter(({ ing }) => !filter || ing.name.toLowerCase().includes(filter.toLowerCase()));
   panel.append(
     h('h2', {}, T('ing.title')),
-    h('p', { class: 'help' }, T('ing.help')),
+    h('p', { class: 'help' }, `${T('ing.help')} ${T('v2.qtyHelp')}`),
     h(
       'div',
       { class: 'toolbar' },
@@ -387,6 +547,7 @@ function renderIngredients(panel: HTMLElement): void {
                 'ing.density',
                 'ing.pieceWeight',
                 'ing.unitCost',
+                'ing.trend',
               ] as UiKey[]
             ).map((k) => h('th', { scope: 'col' }, T(k))),
             h('th', {}, h('span', { class: 'visually-hidden' }, T('common.remove'))),
@@ -436,6 +597,7 @@ function renderIngredients(panel: HTMLElement): void {
                 ),
               ),
               h('td', { class: 'out unit-cost', 'data-out': `unit-cost:${ing.id}` }),
+              h('td', { class: 'out price-trend', 'data-out': `price-trend:${ing.id}` }),
               h(
                 'td',
                 {},
@@ -467,7 +629,25 @@ function updateIngredients(): void {
         ? `${formatUnitMoney(v.cost)} / ${unitText(v.unit)}`
         : T('common.none');
     setText(`[data-out="unit-cost:${CSS.escape(ing.id)}"]`, text);
+    setText(`[data-out="price-trend:${CSS.escape(ing.id)}"]`, trendText(ing.id));
   }
+}
+
+function trendText(id: string): string {
+  const ing = compiled?.ingredients.get(id);
+  if (!ing) return '';
+  const t = verifiedPriceChange(ing);
+  if (!t) return '';
+  if (t.status === 'mismatch') return T('common.notVerified');
+  const date = t.from.date;
+  if (t.status === 'pack-changed') return T('ing.trendPack', { date });
+  if (t.change === null) return T('ing.trendFree', { date });
+  if (t.change.n === 0n) return T('ing.trendSame', { date });
+  const abs = t.change.n < 0n ? { n: -t.change.n, d: t.change.d } : t.change;
+  return T(t.change.n > 0n ? 'ing.trendUp' : 'ing.trendDown', {
+    pct: formatPercent(abs),
+    date,
+  });
 }
 
 function addIngredient(): void {
@@ -628,7 +808,15 @@ function renderRecipes(panel: HTMLElement): void {
             'tr',
             {},
             ...(
-              ['rec.item', 'rec.qty', 'rec.unit', 'rec.waste', 'rec.cost', 'rec.share'] as UiKey[]
+              [
+                'rec.item',
+                'rec.qty',
+                'rec.unit',
+                'rec.waste',
+                'rec.counted',
+                'rec.cost',
+                'rec.share',
+              ] as UiKey[]
             ).map((x) => h('th', { scope: 'col' }, T(x))),
             h('th', {}, h('span', { class: 'visually-hidden' }, T('common.remove'))),
           ),
@@ -664,6 +852,17 @@ function renderRecipes(panel: HTMLElement): void {
                   `${lp}.wastePercent`,
                 ),
               ),
+              h(
+                'td',
+                {},
+                numInput(
+                  l.costPercent ?? '100',
+                  `${lk}:counted`,
+                  T('rec.counted'),
+                  `${lp}.costPercent`,
+                  { title: T('rec.countedHelp') },
+                ),
+              ),
               h('td', { class: 'out line-cost' }),
               h('td', { class: 'out line-share' }),
               h(
@@ -687,7 +886,7 @@ function renderRecipes(panel: HTMLElement): void {
               { class: 'sub-row', 'data-sub-of': j },
               h(
                 'td',
-                { colspan: 7 },
+                { colspan: 8 },
                 h(
                   'details',
                   {},
@@ -705,7 +904,7 @@ function renderRecipes(panel: HTMLElement): void {
           h(
             'tr',
             {},
-            h('th', { scope: 'row', colspan: 4 }, T('rec.total')),
+            h('th', { scope: 'row', colspan: 5 }, T('rec.total')),
             h('td', { id: 'recipe-total', class: 'out' }),
             h('td', { colspan: 2 }),
           ),
@@ -714,16 +913,84 @@ function renderRecipes(panel: HTMLElement): void {
             {},
             h(
               'th',
-              { scope: 'row', colspan: 4, id: 'recipe-per-unit-label' },
+              { scope: 'row', colspan: 5, id: 'recipe-per-unit-label' },
               T('rec.perUnit', { unit: unitText(r.yieldUnit) }),
             ),
             h('td', { id: 'recipe-per-unit', class: 'out' }),
             h('td', { colspan: 2 }),
           ),
+          h(
+            'tr',
+            {},
+            h('th', { scope: 'row', colspan: 5 }, T('rec.weight')),
+            h('td', { id: 'recipe-weight', class: 'out', colspan: 3 }),
+          ),
         ),
       ),
     ),
     h('p', { id: 'recipe-problem', class: 'problem', role: 'alert', hidden: true }),
+    h('p', { class: 'help' }, `${T('v2.qtyHelp')} ${T('rec.countedHelp')}`),
+    h(
+      'details',
+      {
+        class: 'tool',
+        id: 'extras',
+        open: Boolean(r.labourMinutes || r.overheadFixed || r.overheadPercent),
+      },
+      h('summary', {}, T('rec.extras')),
+      h('p', { class: 'help' }, T('rec.extrasHelp')),
+      h(
+        'div',
+        { class: 'fields' },
+        ...(
+          [
+            ['labourMinutes', 'rec.labourMinutes'],
+            ['labourRate', 'rec.labourRate'],
+            ['overheadFixed', 'rec.overheadFixed'],
+            ['overheadPercent', 'rec.overheadPercent'],
+          ] as const
+        ).map(([f, label]) =>
+          h(
+            'label',
+            {},
+            T(label),
+            numInput(r[f], `${k}:${f}`, T(label), `${p}.${f}`, { id: `recipe-${f}` }),
+          ),
+        ),
+      ),
+      h(
+        'table',
+        { id: 'extras-table' },
+        h(
+          'tbody',
+          {},
+          h(
+            'tr',
+            {},
+            h('th', { scope: 'row' }, T('rec.labour')),
+            h('td', { id: 'recipe-labour', class: 'out' }),
+          ),
+          h(
+            'tr',
+            {},
+            h('th', { scope: 'row' }, T('rec.overhead')),
+            h('td', { id: 'recipe-overhead', class: 'out' }),
+          ),
+          h(
+            'tr',
+            {},
+            h('th', { scope: 'row' }, T('rec.full')),
+            h('td', { id: 'recipe-full', class: 'out' }),
+          ),
+          h(
+            'tr',
+            {},
+            h('th', { scope: 'row' }, T('rec.fullPerUnit', { unit: unitText(r.yieldUnit) })),
+            h('td', { id: 'recipe-full-per-unit', class: 'out' }),
+          ),
+        ),
+      ),
+    ),
     h(
       'div',
       { class: 'toolbar' },
@@ -736,6 +1003,11 @@ function renderRecipes(panel: HTMLElement): void {
           onclick: addLine,
         },
         T('rec.addLine'),
+      ),
+      h(
+        'button',
+        { id: 'duplicate-recipe', type: 'button', onclick: copyRecipe },
+        T('rec.duplicate'),
       ),
       h(
         'button',
@@ -839,10 +1111,31 @@ function updateRecipe(v: VerifiedProject | null): void {
   const rows = document.querySelectorAll<HTMLTableRowElement>('#line-table tbody tr[data-line]');
   rows.forEach((row, j) => {
     setText('.line-cost', card?.lines[j]?.cost || T('common.none'), row);
-    setText('.line-share', card?.lines[j]?.share || '', row);
+    const counted = card?.lines[j]?.counted;
+    setText(
+      '.line-share',
+      counted ? `${card?.lines[j]?.share ?? ''} · ${counted}` : card?.lines[j]?.share || '',
+      row,
+    );
   });
   setText('#recipe-total', card?.total ?? T('common.none'));
   setText('#recipe-per-unit', card?.perUnit ?? T('common.none'));
+  const none = T('common.none');
+  setText('#recipe-labour', card?.extras?.labour ?? none);
+  setText('#recipe-overhead', card?.extras?.overhead ?? none);
+  setText('#recipe-full', card?.extras?.full ?? none);
+  setText('#recipe-full-per-unit', card?.extras?.fullPerUnit ?? none);
+  const w = card?.weight;
+  setText(
+    '#recipe-weight',
+    !w
+      ? none
+      : w.status === 'missing'
+        ? T('rec.weightMissing', { items: w.lines.join('、') })
+        : w.perPortion
+          ? T('rec.weightPer', { total: w.total, per: w.perPortion })
+          : w.total,
+  );
   setText('#recipe-heading', r.name || '—');
   const prob = byId('recipe-problem');
   prob.hidden = !card?.problem;
@@ -877,7 +1170,7 @@ function updateRecipe(v: VerifiedProject | null): void {
   const tbody = document.querySelector('#scale-table tbody');
   if (tbody) {
     tbody.replaceChildren();
-    const target = parseDecimal(scaleTo);
+    const target = parseQuantity(scaleTo);
     const vr = v?.recipes.get(r.id);
     if (compiled && target.ok && target.value.n > 0n && vr?.status === 'ok') {
       const cr = compiled.recipes.get(r.id)!;
@@ -907,7 +1200,7 @@ function updateRecipe(v: VerifiedProject | null): void {
   // how much can I make
   const out = document.getElementById('can-result');
   if (out) {
-    const q = parseDecimal(canQty);
+    const q = parseQuantity(canQty);
     let text = '';
     if (compiled && q.ok && canIngredient && compiled.ingredients.has(canIngredient)) {
       const res = verifiedMaxYield(compiled, r.id, canIngredient, q.value, canUnit);
@@ -937,6 +1230,17 @@ function addRecipe(): void {
   selectedRecipe = id;
   changed(true);
   byId<HTMLInputElement>('recipe-name').select();
+  byId<HTMLInputElement>('recipe-name').focus();
+}
+
+function copyRecipe(): void {
+  const r = stored.recipes.find((x) => x.id === selectedRecipe);
+  if (!r) return;
+  const copy = duplicateRecipe(r, newId('r', stored.recipes), lang);
+  stored.recipes.splice(stored.recipes.indexOf(r) + 1, 0, copy);
+  selectedRecipe = copy.id;
+  say(T('rec.duplicated', { name: copy.name }));
+  changed(true);
   byId<HTMLInputElement>('recipe-name').focus();
 }
 
@@ -1188,6 +1492,7 @@ function renderImpact(panel: HTMLElement): void {
       ),
     ),
     h('p', { id: 'impact-note', role: 'status' }),
+    historySection(),
     h(
       'div',
       { class: 'table-wrap' },
@@ -1209,6 +1514,71 @@ function renderImpact(panel: HTMLElement): void {
       ),
     ),
   );
+}
+
+function historySection(): HTMLElement {
+  const ing = stored.ingredients.find((i) => i.id === impactIngredient);
+  const hist = ing?.priceHistory ?? [];
+  const box = h('section', { id: 'price-history', 'aria-labelledby': 'history-title' });
+  box.append(h('h3', { id: 'history-title' }, T('impact.history')));
+  if (!ing || hist.length === 0) {
+    box.append(h('p', { class: 'help' }, T('impact.historyNone')));
+    return box;
+  }
+  box.append(
+    h(
+      'table',
+      { id: 'history-table' },
+      h(
+        'thead',
+        {},
+        h(
+          'tr',
+          {},
+          h('th', { scope: 'col' }, T('impact.date')),
+          h('th', { scope: 'col' }, T('ing.price')),
+          h('th', { scope: 'col' }, T('impact.pack')),
+          h('th', {}, h('span', { class: 'visually-hidden' }, T('common.remove'))),
+        ),
+      ),
+      h(
+        'tbody',
+        {},
+        hist
+          .map((x, n) => ({ x, n }))
+          .reverse()
+          .map(({ x, n }) => {
+            const samePack = x.packUnit === ing.packUnit && sameQty(x.packQty, ing.packQty);
+            return h(
+              'tr',
+              { 'data-history': n },
+              h('td', {}, x.date),
+              h('td', { class: 'num' }, x.price),
+              h('td', {}, `${x.packQty} ${unitText(x.packUnit)}`),
+              h(
+                'td',
+                {},
+                samePack
+                  ? h('button', { type: 'button', 'data-use-price': x.price }, T('impact.useOld'))
+                  : h('span', { class: 'muted' }, T('impact.otherPack')),
+                ' ',
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'remove',
+                    'data-remove-history': n,
+                    'aria-label': T('impact.removeOld', { date: x.date }),
+                  },
+                  '×',
+                ),
+              ),
+            );
+          }),
+      ),
+    ),
+  );
+  return box;
 }
 
 function updateImpact(): void {
@@ -1300,6 +1670,28 @@ function renderData(panel: HTMLElement): void {
         numInput(s.highPercent, 'high', T('data.high'), 'settings.highPercent', { id: 'high' }),
       ),
     ),
+    measuresSection(),
+    h('h3', {}, T('data.storage')),
+    h(
+      'p',
+      { id: 'persist-status', 'data-status': persistStatus, role: 'status' },
+      T(`persist.${persistStatus}` as UiKey),
+    ),
+    h(
+      'button',
+      {
+        id: 'persist-again',
+        type: 'button',
+        hidden: persistStatus !== 'not-persisted',
+        onclick: () => void askPersist(true),
+      },
+      T('persist.ask'),
+    ),
+    h(
+      'p',
+      { id: 'last-backup', class: 'muted' },
+      backup.lastAt ? T('backup.last', { d: backup.lastAt.slice(0, 10) }) : T('backup.never'),
+    ),
     h('h3', {}, T('data.files')),
     h(
       'div',
@@ -1320,8 +1712,7 @@ function renderData(panel: HTMLElement): void {
         {
           id: 'save-json',
           type: 'button',
-          onclick: () =>
-            download(fileName(stored.name, 'json'), stringifyProject(stored), 'application/json'),
+          onclick: backupNow,
         },
         T('data.save'),
       ),
@@ -1395,6 +1786,99 @@ function renderData(panel: HTMLElement): void {
   );
 }
 
+function measuresSection(): HTMLElement {
+  return h(
+    'section',
+    { id: 'measures', 'aria-labelledby': 'measures-title' },
+    h('h3', { id: 'measures-title' }, T('data.measures')),
+    h('p', { class: 'help' }, T('data.measuresHelp')),
+    stored.measures.length
+      ? h(
+          'table',
+          { id: 'measure-table' },
+          h(
+            'thead',
+            {},
+            h(
+              'tr',
+              {},
+              h('th', { scope: 'col' }, T('data.measureName')),
+              h('th', { scope: 'col' }, T('data.measureAmount')),
+              h('th', { scope: 'col' }, T('data.measureUnit')),
+              h('th', {}, h('span', { class: 'visually-hidden' }, T('common.remove'))),
+            ),
+          ),
+          h(
+            'tbody',
+            {},
+            stored.measures.map((m, i) => {
+              const p = `measures[${i}]`;
+              const k = `measure:${m.id}`;
+              return h(
+                'tr',
+                { 'data-measure': m.id },
+                h('td', {}, textInput(m.name, `${k}:name`, T('data.measureName'), `${p}.name`)),
+                h(
+                  'td',
+                  {},
+                  numInput(m.amount, `${k}:amount`, T('data.measureAmount'), `${p}.amount`),
+                ),
+                h(
+                  'td',
+                  {},
+                  h(
+                    'select',
+                    {
+                      'data-key': `${k}:unit`,
+                      'data-path': `${p}.unit`,
+                      'aria-label': T('data.measureUnit'),
+                    },
+                    UNIT_IDS.map((u) =>
+                      h('option', { value: u, selected: u === m.unit }, unitText(u)),
+                    ),
+                  ),
+                ),
+                h(
+                  'td',
+                  {},
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      class: 'remove',
+                      'data-remove-measure': m.id,
+                      'aria-label': T('common.removeNamed', { name: m.name }),
+                    },
+                    '×',
+                  ),
+                ),
+              );
+            }),
+          ),
+        )
+      : null,
+    h(
+      'button',
+      {
+        id: 'add-measure',
+        type: 'button',
+        onclick: () => {
+          const id = newId('m', stored.measures);
+          stored.measures.push({
+            id,
+            name: `${T('data.newMeasure')} ${stored.measures.length + 1}`,
+            amount: '250',
+            unit: 'ml',
+          });
+          changed(true);
+          document.querySelector<HTMLInputElement>(`[data-key="measure:${id}:name"]`)?.select();
+        },
+      },
+      T('data.addMeasure'),
+    ),
+  );
+}
+
 function replaceProject(p: StoredProject): void {
   stored = p;
   selectedRecipe = '';
@@ -1404,6 +1888,7 @@ function replaceProject(p: StoredProject): void {
 async function deleteAll(): Promise<void> {
   if (!confirm(T('data.deleteConfirm'))) return;
   clearTimeout(saveTimer);
+  savePending = false;
   await wipeAll();
   stored = emptyProject(T('data.title'));
   selectedRecipe = '';
@@ -1447,10 +1932,10 @@ function applyEdit(key: string, raw: string, final: boolean): boolean {
   const value =
     final &&
     (parts.at(-1) ?? '').match(
-      /qty|Qty|price|Percent|yield|density|pieceWeight|waste|target|service|good|high/,
+      /qty|Qty|price|Percent|yield|density|pieceWeight|waste|counted|target|service|good|high|amount|labour|overhead/,
     ) &&
     !key.endsWith(':service')
-      ? tidyNumber(raw)
+      ? tidyNumber(raw, /^(qty|packQty|yieldQty|portionQty|amount)$/.test(parts.at(-1) ?? ''))
       : raw;
   if (final && value !== raw) {
     const el = document.querySelector<HTMLInputElement>(`[data-key="${CSS.escape(key)}"]`);
@@ -1465,6 +1950,18 @@ function applyEdit(key: string, raw: string, final: boolean): boolean {
       if (value.trim() === '' && field !== 'yieldPercent') delete ing[field];
       else ing[field] = value;
     } else (ing as unknown as Record<string, string>)[field] = value;
+    if (field === 'packUnit' || (final && (field === 'price' || field === 'packQty')))
+      notePriceEdit(ing);
+    changed(false);
+    return true;
+  }
+  if (parts[0] === 'measure') {
+    const m = stored.measures.find((x) => x.id === parts[1]);
+    if (!m) return true;
+    const f = parts[2];
+    if (f === 'name') m.name = value;
+    else if (f === 'amount') m.amount = value;
+    else if (f === 'unit' && isUnitId(value)) m.unit = value;
     changed(false);
     return true;
   }
@@ -1486,6 +1983,9 @@ function applyEdit(key: string, raw: string, final: boolean): boolean {
       else if (f === 'waste') {
         if (value.trim() === '' || value.trim() === '0') delete l.wastePercent;
         else l.wastePercent = value;
+      } else if (f === 'counted') {
+        if (value.trim() === '' || value.trim() === '100') delete l.costPercent;
+        else l.costPercent = value;
       }
       changed(false);
       return true;
@@ -1496,9 +1996,15 @@ function applyEdit(key: string, raw: string, final: boolean): boolean {
       changed(true);
       return true;
     }
-    if (f === 'density') {
-      if (value.trim() === '') delete r.density;
-      else r.density = value;
+    if (
+      f === 'density' ||
+      f === 'labourMinutes' ||
+      f === 'labourRate' ||
+      f === 'overheadFixed' ||
+      f === 'overheadPercent'
+    ) {
+      if (value.trim() === '') delete r[f];
+      else r[f] = value;
     } else if (f === 'name' || f === 'yieldQty') r[f] = value;
     changed(false);
     if (final && f === 'name') render();
@@ -1526,7 +2032,8 @@ function applyEdit(key: string, raw: string, final: boolean): boolean {
       return true;
     case 'impact-ingredient':
       impactIngredient = raw;
-      break;
+      render();
+      return true;
     case 'impact-price':
       impactPrice = raw;
       break;
@@ -1623,6 +2130,23 @@ function onClick(e: MouseEvent): void {
   } else if (t.dataset.removeMenu) {
     stored.menu = stored.menu.filter((x) => x.id !== t.dataset.removeMenu);
     changed(true);
+  } else if (t.dataset.removeMeasure) {
+    const id = t.dataset.removeMeasure;
+    const m = stored.measures.find((x) => x.id === id)!;
+    const users = measureUses(stored, id);
+    if (users.length) return say(T('data.measureInUse', { name: m.name, users: users.join('、') }));
+    stored.measures = stored.measures.filter((x) => x.id !== id);
+    changed(true);
+  } else if (t.dataset.usePrice !== undefined) {
+    impactPrice = t.dataset.usePrice;
+    byId<HTMLInputElement>('impact-price').value = impactPrice;
+    refresh(false);
+  } else if (t.dataset.removeHistory !== undefined) {
+    const ing = stored.ingredients.find((i) => i.id === impactIngredient);
+    if (!ing?.priceHistory) return;
+    ing.priceHistory.splice(Number(t.dataset.removeHistory), 1);
+    if (!ing.priceHistory.length) delete ing.priceHistory;
+    changed(true);
   }
 }
 
@@ -1655,6 +2179,7 @@ function setTab(next: Tab): void {
 async function start(): Promise<void> {
   const saved = await loadState();
   if (saved && typeof saved === 'object') {
+    void askPersist(); // the user has their own data here
     const r = validateProject(saved);
     if (r.ok) stored = r.value.stored;
     else if (
@@ -1715,8 +2240,13 @@ async function start(): Promise<void> {
     onInput(e);
   });
   app.addEventListener('click', onClick);
+  addEventListener('pagehide', flushSave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSave();
+  });
   applySettings();
   render();
+  updateReminder();
   document.body.dataset.ready = 'true';
   if ('serviceWorker' in navigator && import.meta.env.PROD)
     void navigator.serviceWorker.register('./sw.js').catch(() => undefined);

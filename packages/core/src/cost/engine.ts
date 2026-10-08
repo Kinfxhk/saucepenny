@@ -5,6 +5,8 @@
 //   2. line cost = quantity in base units × cost per base unit ÷ (1 − line waste)
 //   3. recipe total = Σ line costs; cost per yield unit = total ÷ yield
 //   4. a sub-recipe line costs quantity × the sub-recipe's cost per yield unit
+//   (v0.2) every line cost is then multiplied by its counted share (1 unless set; a line
+//   counted at 0% is a "pinch, not costed" and needs no unit conversion)
 // Recursion over the sub-recipe graph with memoisation by recipe id. Everything is exact.
 
 import { analyse, buildGraph } from '../graph/index';
@@ -102,6 +104,11 @@ export function costRecipes(project: Project, only?: Iterable<string>): Map<stri
     for (let j = 0; j < recipe.lines.length; j++) {
       const line = recipe.lines[j]!;
       const lp = `${path}.lines[${j}]`;
+      if (line.share.n === 0n) {
+        // "a pinch, not costed": nothing to convert, nothing to add
+        lines.push(ZERO);
+        continue;
+      }
       const lu = resolveUnit(line.unit, project.measures);
       let unitCost: Rational;
       let qtyBase: Rational;
@@ -143,7 +150,7 @@ export function costRecipes(project: Project, only?: Iterable<string>): Map<stri
         qtyBase = q.value;
         unitCost = cc.perYieldBase;
       }
-      const cost = div(mul(qtyBase, unitCost), sub(ONE, line.waste));
+      const cost = mul(div(mul(qtyBase, unitCost), sub(ONE, line.waste)), line.share);
       lines.push(cost);
       total = add(total, cost);
     }

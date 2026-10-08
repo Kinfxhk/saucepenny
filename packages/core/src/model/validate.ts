@@ -9,6 +9,7 @@ import {
   gt,
   lt,
   parseDecimal,
+  parseQuantity,
   PRICE_ROUNDINGS,
   rat,
   sign,
@@ -25,12 +26,14 @@ import type {
   LineRef,
   Measure,
   MenuItem,
+  PricePoint,
   Project,
   Recipe,
   StoredIngredient,
   StoredLine,
   StoredMeasure,
   StoredMenuItem,
+  StoredPricePoint,
   StoredProject,
   StoredRecipe,
   StoredSettings,
@@ -39,7 +42,16 @@ import type {
 import { PROJECT_SCHEMA, PROJECT_VERSION } from './types';
 
 const ID_RE = /^[A-Za-z0-9_-]+$/;
+/** Fields that are amounts of something: these also accept fractions such as 1 1/2 (v0.2). */
+const QUANTITY_KEYS: ReadonlySet<string> = new Set([
+  'amount',
+  'packQty',
+  'yieldQty',
+  'qty',
+  'portionQty',
+]);
 const HUNDRED = rat(100n);
+const ZERO_R = rat(0n);
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -77,7 +89,7 @@ class Collector {
     if (typeof v === 'string') text = v;
     else if (typeof v === 'number' && Number.isSafeInteger(v)) text = String(v);
     else return this.add('type', p, { expected: 'decimal text' });
-    const r = parseDecimal(text);
+    const r = QUANTITY_KEYS.has(key) ? parseQuantity(text) : parseDecimal(text);
     if (!r.ok) return this.add(r.error, p);
     return r.value;
   }
@@ -244,7 +256,34 @@ export function validateProject(input: unknown): Result<Validated> {
     if (priceDate !== undefined && priceDate !== '' && !isValidDate(priceDate))
       c.add('bad-date', `${p}.priceDate`);
     const note = c.text(g, 'note', p, LIMITS.noteLength, false) ?? '';
+    const history: PricePoint[] = [];
+    const storedHistory: StoredPricePoint[] = [];
+    let historyOk = true;
+    if (g.priceHistory !== undefined)
+      c.array(g, 'priceHistory', p, LIMITS.priceHistory).forEach((h, k) => {
+        const hp = `${p}.priceHistory[${k}]`;
+        if (!isObj(h)) {
+          historyOk = false;
+          return c.add('type', hp, { expected: 'object' });
+        }
+        const date = c.text(h, 'date', hp, 10, true);
+        if (date !== undefined && !isValidDate(date)) c.add('bad-date', `${hp}.date`);
+        const hPrice = c.nonNegative(h, 'price', hp);
+        const hQty = c.positive(h, 'packQty', hp);
+        const hUnit = checkUnitRef(c, h.packUnit, `${hp}.packUnit`, measureIds);
+        if (hUnit === 'portion') c.add('bad-unit', `${hp}.packUnit`);
+        if (date && isValidDate(date) && hPrice && hQty && hUnit && hUnit !== 'portion') {
+          history.push({ date, price: hPrice, packQty: hQty, packUnit: hUnit });
+          storedHistory.push({
+            date,
+            price: String(h.price),
+            packQty: String(h.packQty),
+            packUnit: hUnit,
+          });
+        } else historyOk = false;
+      });
     if (
+      historyOk &&
       id &&
       nm !== undefined &&
       packQty &&
@@ -265,6 +304,7 @@ export function validateProject(input: unknown): Result<Validated> {
         pieceWeight,
         priceDate: priceDate || undefined,
         note,
+        priceHistory: history,
       });
       const s: StoredIngredient = {
         id,
@@ -278,6 +318,7 @@ export function validateProject(input: unknown): Result<Validated> {
       if (g.pieceWeight !== undefined) s.pieceWeight = String(g.pieceWeight);
       if (priceDate) s.priceDate = priceDate;
       if (note) s.note = note;
+      if (storedHistory.length) s.priceHistory = storedHistory;
       storedIngredients.push(s);
     }
   });
@@ -297,6 +338,21 @@ export function validateProject(input: unknown): Result<Validated> {
     const yieldUnit = checkUnitRef(c, r.yieldUnit, `${p}.yieldUnit`, measureIds);
     const density = c.positive(r, 'density', p, false);
     const note = c.text(r, 'note', p, LIMITS.noteLength, false) ?? '';
+    // Optional labour and overhead (v0.2). Missing means 0.
+    const extraField = (key: string): Rational | undefined =>
+      r[key] === undefined ? ZERO_R : c.nonNegative(r, key, p);
+    const labourMinutes = extraField('labourMinutes');
+    const labourRate = extraField('labourRate');
+    const overheadFixed = extraField('overheadFixed');
+    const overheadPct = extraField('overheadPercent');
+    if (overheadPct !== undefined && gt(overheadPct, rat(1000n)))
+      c.add('overhead-out-of-range', `${p}.overheadPercent`);
+    const extrasOk =
+      labourMinutes !== undefined &&
+      labourRate !== undefined &&
+      overheadFixed !== undefined &&
+      overheadPct !== undefined &&
+      !gt(overheadPct, rat(1000n));
     const lines: Line[] = [];
     const storedLines: StoredLine[] = [];
     let linesOk = true;
@@ -329,16 +385,47 @@ export function validateProject(input: unknown): Result<Validated> {
           waste = undefined;
         } else waste = w === undefined ? undefined : div(w, HUNDRED);
       }
-      if (ref && qty && unit && waste) {
-        lines.push({ ref, qty, unit, waste });
+      let share: Rational | undefined = rat(1n);
+      if (l.costPercent !== undefined) {
+        const cp = c.decimal(l, 'costPercent', lp);
+        if (cp !== undefined && (sign(cp) < 0 || gt(cp, HUNDRED))) {
+          c.add('percent-out-of-range', `${lp}.costPercent`);
+          share = undefined;
+        } else share = cp === undefined ? undefined : div(cp, HUNDRED);
+      }
+      if (ref && qty && unit && waste && share) {
+        lines.push({ ref, qty, unit, waste, share });
         const sl: StoredLine = { ref, qty: String(l.qty), unit };
         if (l.wastePercent !== undefined) sl.wastePercent = String(l.wastePercent);
+        if (l.costPercent !== undefined) sl.costPercent = String(l.costPercent);
         storedLines.push(sl);
       } else linesOk = false;
     });
-    if (id && nm !== undefined && yieldQty && sign(yieldQty) > 0 && yieldUnit && linesOk) {
+    if (
+      id &&
+      nm !== undefined &&
+      yieldQty &&
+      sign(yieldQty) > 0 &&
+      yieldUnit &&
+      linesOk &&
+      extrasOk
+    ) {
       if (recipes.has(id)) return;
-      recipes.set(id, { id, name: nm, yieldQty, yieldUnit, density, lines, note });
+      recipes.set(id, {
+        id,
+        name: nm,
+        yieldQty,
+        yieldUnit,
+        density,
+        lines,
+        note,
+        extras: {
+          labourMinutes,
+          labourRate,
+          overheadFixed,
+          overheadRate: div(overheadPct, HUNDRED),
+        },
+      });
       const s: StoredRecipe = {
         id,
         name: nm,
@@ -348,6 +435,8 @@ export function validateProject(input: unknown): Result<Validated> {
       };
       if (r.density !== undefined) s.density = String(r.density);
       if (note) s.note = note;
+      for (const k of ['labourMinutes', 'labourRate', 'overheadFixed', 'overheadPercent'] as const)
+        if (r[k] !== undefined) s[k] = String(r[k]);
       storedRecipes.push(s);
     }
   });

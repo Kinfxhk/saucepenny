@@ -8,7 +8,12 @@ import type { Lang } from '../i18n/index';
 import { LIMITS } from '../model/limits';
 import type { ProjectError, StoredIngredient } from '../model/index';
 import { emptyProject, validateProject } from '../model/index';
-import { normaliseDecimalInput, parseDecimal } from '../num/index';
+import {
+  normaliseDecimalInput,
+  normaliseQuantityInput,
+  parseDecimal,
+  parseQuantity,
+} from '../num/index';
 import { parseUnit } from '../units/index';
 import { parseCsv, toCsv, type CsvParseError } from './csv';
 
@@ -167,7 +172,7 @@ export function importIngredientsCsv(
       let v = get(c);
       if (v === '' && c !== 'packQty' && c !== 'price') continue;
       if (/^'[=+\-@]/.test(v)) v = v.slice(1); // our own exports neutralise formula-like cells
-      const r = parseDecimal(v);
+      const r = c === 'packQty' ? parseQuantity(v) : parseDecimal(v);
       if (!r.ok) {
         problems.push({
           kind: 'row',
@@ -178,7 +183,10 @@ export function importIngredientsCsv(
         bad = true;
         continue;
       }
-      (ing as unknown as Record<string, string>)[c] = normaliseDecimalInput(v).replace(/,/g, '');
+      (ing as unknown as Record<string, string>)[c] =
+        c === 'packQty' && normaliseQuantityInput(v).includes('/')
+          ? normaliseQuantityInput(v)
+          : normaliseDecimalInput(v).replace(/,/g, '');
     }
     const unitText = get('packUnit');
     const unit = parseUnit(unitText);

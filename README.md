@@ -22,6 +22,23 @@ recipes, such as a sauce or a syrup). Saucepenny works out the cost of every rec
 
 ![The Recipes tab: char siu rice with its char siu sub-recipe expanded, line costs, shares and cost per portion](docs/screenshot.png)
 
+### New in v0.2
+
+- **Fractions** in quantities: `1/2`, `1 1/2`, `½`, `1½` (kept exactly as typed).
+- **Duplicate recipe** to make a variation in one click.
+- **Custom measures** (scoop, bowl, cup…) can be added, renamed and removed in the Data
+  tab; a measure in use cannot be removed.
+- **Labour and overhead** per batch (minutes × hourly rate, fixed amount, % of food
+  cost), shown as a **full cost**. The food cost % on the menu is unchanged.
+- **Price history**: old prices are kept when you change one, the change % is shown, and
+  the price change tool can start from any old price.
+- **"Pinch" lines** (少量): a line can count 0–100% of its cost; 0% needs no conversion.
+  Reports mark these lines.
+- **Recipe weight**: total ingredient weight per batch and per portion.
+- **Keep data safe**: Saucepenny asks the browser to keep its storage (and shows whether
+  it agreed), and reminds you to save a backup file after many changes or two weeks.
+  The reminder never uses the network and can be dismissed.
+
 ### Use it
 
 - **In the browser:** <https://kinfxhk.github.io/saucepenny/> — nothing to install, and
@@ -114,6 +131,19 @@ If Saucepenny helps you, you can support it at
 - 授權：[AGPL-3.0-or-later](LICENSE)。
 
 ![食譜分頁：叉燒飯，展開叉燒子食譜，顯示每行成本、佔比及每份成本](docs/screenshot.png)
+
+### v0.2 新功能
+
+- 用量可輸入**分數**：`1/2`、`1 1/2`、`½`、`1½`（按輸入原樣精確保存）。
+- **複製食譜**，一按即可做變化版本。
+- 在「資料」頁新增、改名及刪除**自訂量度**（羹、殼、碗等）；使用中的量度不能刪除。
+- 每批**人工及雜費**（分鐘 × 每小時成本、固定金額、食材成本的百分比），顯示**全部成本**；
+  餐牌上的 food cost % 不變。
+- **價錢紀錄**：改價時保留舊價錢並顯示變幅；加價影響工具可從任何舊價錢開始試算。
+- **「少量」行**：每行可只計 0–100% 成本；0% 毋須換算單位，報表會註明。
+- **食譜重量**：每批及每份的材料總重。
+- **保護資料**：菜本易會向瀏覽器申請保留儲存（並顯示結果），在多次修改或兩星期後提醒你
+  儲存備份檔；提醒不經網絡，可以關閉。
 
 ### 使用方法
 

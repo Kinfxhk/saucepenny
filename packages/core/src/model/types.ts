@@ -8,7 +8,8 @@ import type { PriceRounding, Rational } from '../num/index';
 import type { UnitId } from '../units/index';
 
 export const PROJECT_SCHEMA = 'saucepenny/project';
-export const PROJECT_VERSION = 1;
+/** 1 = v0.1; 2 = v0.2 (fractions, price history, labour/overhead; all optional). */
+export const PROJECT_VERSION = 2;
 
 /** A built-in unit id, "portion" (recipe yields counted in portions) or "measure:<id>". */
 export type UnitRef = UnitId | 'portion' | `measure:${string}`;
@@ -36,6 +37,17 @@ export interface StoredIngredient {
   /** YYYY-MM-DD */
   priceDate?: string;
   note?: string;
+  /** Earlier prices, oldest first (v0.2). The current price is not repeated here. */
+  priceHistory?: StoredPricePoint[];
+}
+
+export interface StoredPricePoint {
+  /** YYYY-MM-DD the price applied from (or was recorded) */
+  date: string;
+  price: string;
+  /** pack the price was for (packs change; prices are compared per pack only if equal) */
+  packQty: string;
+  packUnit: UnitRef;
 }
 
 export type LineRef = { kind: 'ingredient'; id: string } | { kind: 'recipe'; id: string };
@@ -46,6 +58,12 @@ export interface StoredLine {
   unit: UnitRef;
   /** Extra loss for this line only, in percent (0 <= w < 100). Default "0". */
   wastePercent?: string;
+  /**
+   * Share of this line's cost that is counted, in percent (0 <= c <= 100; v0.2). Default
+   * "100". "0" means "a pinch, not costed": no conversion is needed and reports say so.
+   * Quantities (scaling, how much can I make, weight) are never affected.
+   */
+  costPercent?: string;
 }
 
 export interface StoredRecipe {
@@ -57,6 +75,14 @@ export interface StoredRecipe {
   density?: string;
   lines: StoredLine[];
   note?: string;
+  /** Optional labour and overhead per batch (v0.2). Food cost % never includes these. */
+  labourMinutes?: string;
+  /** money per hour */
+  labourRate?: string;
+  /** money per batch (gas, packaging, ...) */
+  overheadFixed?: string;
+  /** percent of the food cost added as overhead */
+  overheadPercent?: string;
 }
 
 export interface StoredMenuItem {
@@ -115,6 +141,23 @@ export interface Ingredient {
   pieceWeight: Rational | undefined;
   priceDate: string | undefined;
   note: string;
+  priceHistory: PricePoint[];
+}
+
+export interface PricePoint {
+  date: string;
+  price: Rational;
+  packQty: Rational;
+  packUnit: UnitRef;
+}
+
+export interface RecipeExtras {
+  labourMinutes: Rational;
+  /** money per hour */
+  labourRate: Rational;
+  overheadFixed: Rational;
+  /** fraction of the food cost */
+  overheadRate: Rational;
 }
 
 export interface Line {
@@ -123,6 +166,8 @@ export interface Line {
   unit: UnitRef;
   /** fraction 0 <= w < 1 */
   waste: Rational;
+  /** counted share of the cost, 0 <= s <= 1 (1 unless set) */
+  share: Rational;
 }
 
 export interface Recipe {
@@ -133,6 +178,7 @@ export interface Recipe {
   density: Rational | undefined;
   lines: Line[];
   note: string;
+  extras: RecipeExtras;
 }
 
 export interface MenuItem {

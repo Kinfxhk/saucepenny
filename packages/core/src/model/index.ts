@@ -10,6 +10,7 @@ export * from './json';
 export * from './defaults';
 export * from './migrate';
 export * from './validate';
+export * from './edit';
 
 /** Read an untrusted project file: size/depth/key defences, then strict validation. */
 export function readProjectJson(text: string): Result<Validated> {

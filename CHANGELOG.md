@@ -6,6 +6,47 @@ All notable changes to Saucepenny are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
+Improvements from what users of other recipe-costing tools ask for most. 根據其他食譜
+成本工具用戶最常提出的需要而改進。Calculation rules version 2.
+
+### Added
+
+- **Fractions** in quantity fields (amounts, pack quantity, yield, portion size, scale to,
+  what I have): `1/2`, `1 1/2`, `½`, `1½`, full-width `１／２`. Kept as typed, exact.
+  Zero denominators and improper mixed numbers are refused with a message.
+- **Duplicate recipe** (name gets " (copy)" / "（副本）").
+- **Custom measures UI** in the Data tab: add, rename, change amount and unit, remove
+  (refused while a recipe uses the measure).
+- **Labour and overhead** per batch: labour minutes × hourly rate, fixed overhead,
+  overhead % of food cost, full cost and full cost per yield unit (rule 13), checked by
+  the independent checker. Food cost % is unchanged. Shown in reports, CSV and print.
+- **Price history**: changing a price or pack keeps the old one (up to 50), the
+  Ingredients tab shows the change %, and the Price change tab lists old prices with
+  "Try this price" (rule 15).
+- **Cost counted %** per line (default 100%); 0% is a "pinch" (少量) whose unit needs no
+  conversion. Reports and CSV mark such lines. "How much can I make" still uses the full
+  amount.
+- **Recipe weight**: ingredient weight per batch and per portion, as entered (rule 14);
+  lines that cannot be weighed are listed.
+- **Persistent storage**: Saucepenny asks the browser to keep its data
+  (`navigator.storage.persist()`), shows the result in the Data tab, and falls back
+  quietly where the browser does not support it.
+- **Backup reminder** after 20 changes or 14 days without a backup file; "Not now" snoozes
+  it for 7 days. No network is used.
+- **Independent Python oracle** (`tools/oracle/oracle.py`, standard library only, in CI on
+  Linux and Windows): many thousands of random cases for number and fraction parsing,
+  unit conversion, recipe and menu costing (including food cost bands at their exact
+  boundaries), labour/overhead, weights and price changes.
+
+### Changed
+
+- Project files are now version 2 (new optional fields only). Version 1 files open
+  unchanged and are saved as version 2.
+- Edits are saved at most one second after typing (previously only after a pause), and
+  pending changes are saved when the page is hidden or closed.
+
 ## [0.1.0] - 2026-10-08
 
 First public release.

@@ -4,21 +4,31 @@
 // by the independent checker; a number is marked verified only when both agree *exactly*.
 // If they ever disagree, the number is withheld and an internal error is shown instead.
 
-import { Checker, isValidSuggestion, netPriceOf, recomputeMenu } from './check/index';
+import {
+  Checker,
+  isValidSuggestion,
+  netPriceOf,
+  recomputeExtras,
+  recomputeMenu,
+  recomputeWeight,
+} from './check/index';
 import {
   costRecipes,
+  hasExtras,
   ingredientCost,
   maxYield,
   priceImpact,
   priceItem,
+  recipeExtras,
+  recipeWeight,
   withPrice,
   type ImpactRow,
   type MenuCost,
   type RecipeCost,
 } from './cost/index';
 import { resolveUnit, toBaseOf } from './cost/units';
-import type { Project, ProjectError, UnitRef } from './model/index';
-import { cmp, div, eq, mul, rat, type Rational } from './num/index';
+import type { Ingredient, PricePoint, Project, ProjectError, UnitRef } from './model/index';
+import { add, cmp, div, eq, mul, rat, sub, type Rational } from './num/index';
 import { UNITS, type UnitId } from './units/index';
 
 export type VerifiedRecipe =
@@ -29,6 +39,14 @@ export type VerifiedRecipe =
       perYieldUnit: Rational;
       lines: Rational[];
       depth: number;
+      /** labour and overhead (v0.2); null when the recipe has none entered */
+      extras: {
+        labour: Rational;
+        overhead: Rational;
+        /** food + labour + overhead per batch */
+        full: Rational;
+        fullPerYieldUnit: Rational;
+      } | null;
     }
   | { status: 'error'; error: ProjectError }
   | { status: 'mismatch'; detail: string };
@@ -53,12 +71,53 @@ export function verifyRecipe(
   for (let j = 0; j < engine.lines.length; j++)
     if (!eq(chk.lineCosts[j]!, engine.lines[j]!))
       return { status: 'mismatch', detail: `line ${j + 1}` };
+  let extras: Extract<VerifiedRecipe, { status: 'ok' }>['extras'] = null;
+  if (hasExtras(recipe)) {
+    const e = recipeExtras(recipe, engine.total);
+    const c = recomputeExtras(recipe, chk.total);
+    if (!eq(e.labour, c.labour)) return { status: 'mismatch', detail: 'labour' };
+    if (!eq(e.overhead, c.overhead)) return { status: 'mismatch', detail: 'overhead' };
+    if (!eq(e.full, c.full)) return { status: 'mismatch', detail: 'full cost' };
+    const fullPerYieldUnit = div(e.full, recipe.yieldQty);
+    const checkPer = add(chk.perYieldUnit, div(add(c.labour, c.overhead), recipe.yieldQty));
+    if (!eq(fullPerYieldUnit, checkPer))
+      return { status: 'mismatch', detail: 'full cost per yield unit' };
+    extras = { ...e, fullPerYieldUnit };
+  }
   return {
     status: 'ok',
     total: engine.total,
     perYieldUnit,
     lines: engine.lines,
     depth: engine.depth,
+    extras,
+  };
+}
+
+export type VerifiedWeight =
+  | {
+      status: 'ok';
+      grams: Rational;
+      /** grams per portion when the recipe yields portions */ perPortion: Rational | null;
+    }
+  | { status: 'missing'; lines: number[] }
+  | { status: 'mismatch'; detail: string };
+
+/** Ingredient weight of one batch, engine and checker agreeing exactly. */
+export function verifiedWeight(project: Project, id: string): VerifiedWeight {
+  const recipe = project.recipes.get(id)!;
+  const e = recipeWeight(project, recipe);
+  const c = recomputeWeight(project, recipe);
+  if (!e.ok) {
+    if ('grams' in c || c.missing.join() !== e.missing.join())
+      return { status: 'mismatch', detail: 'weight lines' };
+    return { status: 'missing', lines: e.missing };
+  }
+  if (!('grams' in c) || !eq(c.grams, e.grams)) return { status: 'mismatch', detail: 'weight' };
+  return {
+    status: 'ok',
+    grams: e.grams,
+    perPortion: recipe.yieldUnit === 'portion' ? div(e.grams, recipe.yieldQty) : null,
   };
 }
 
@@ -244,7 +303,7 @@ export function verifiedMaxYield(
 ): VerifiedMaxYield {
   const res = maxYield(project, recipeId, ingredientId, qty, unit);
   if (!res.ok) return { status: 'error', error: res.error };
-  const packs = new Checker(project).packsFor(recipeId, rat(1n));
+  const packs = new Checker(project).packsFor(recipeId, rat(1n), true);
   if (typeof packs === 'string') return { status: 'mismatch', detail: packs };
   const ing = project.ingredients.get(ingredientId)!;
   const packsPerUnit = packs.get(ingredientId) ?? rat(0n);
@@ -266,4 +325,30 @@ export function verifiedMaxYield(
   if (res.yieldUnits === null || !eq(res.yieldUnits, expected))
     return { status: 'mismatch', detail: 'max yield' };
   return { status: 'ok', yieldUnits: res.yieldUnits };
+}
+
+// ---- Price history (v0.2) ------------------------------------------------------------
+
+export type VerifiedPriceChange =
+  | {
+      status: 'ok';
+      from: PricePoint;
+      /** relative change, e.g. 1/10 for +10%; null when the earlier price was 0 */
+      change: Rational | null;
+    }
+  /** the pack size or unit changed, so prices are not compared */
+  | { status: 'pack-changed'; from: PricePoint }
+  | { status: 'mismatch'; detail: string };
+
+/** Change from the most recent earlier price to the current one; null without history. */
+export function verifiedPriceChange(ing: Ingredient): VerifiedPriceChange | null {
+  const from = ing.priceHistory[ing.priceHistory.length - 1];
+  if (!from) return null;
+  if (from.packUnit !== ing.packUnit || !eq(from.packQty, ing.packQty))
+    return { status: 'pack-changed', from };
+  if (from.price.n === 0n) return { status: 'ok', from, change: null };
+  const engine = div(sub(ing.price, from.price), from.price);
+  const check = sub(div(ing.price, from.price), rat(1n));
+  if (!eq(engine, check)) return { status: 'mismatch', detail: 'price change' };
+  return { status: 'ok', from, change: engine };
 }

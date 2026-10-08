@@ -46,7 +46,11 @@ export function printCards(
                 h(
                   'tr',
                   {},
-                  h('td', {}, `${l.isRecipe ? '↳ ' : ''}${l.name}`),
+                  h(
+                    'td',
+                    {},
+                    `${l.isRecipe ? '↳ ' : ''}${l.name}${l.counted ? ` (${l.counted})` : ''}`,
+                  ),
                   h('td', {}, `${l.qty} ${l.unit}`),
                   h('td', {}, l.waste),
                   h('td', { class: 'num' }, l.cost),
@@ -71,6 +75,38 @@ export function printCards(
                 h('td', { class: 'num' }, c.perUnit ?? none),
                 h('td', {}),
               ),
+              ...(c.extras
+                ? (
+                    [
+                      [T('rec.labour'), c.extras.labour],
+                      [T('rec.overhead'), c.extras.overhead],
+                      [T('rec.full'), c.extras.full],
+                      [T('rec.fullPerUnit', { unit: c.perUnitLabel }), c.extras.fullPerUnit],
+                    ] as const
+                  ).map(([label, value]) =>
+                    h(
+                      'tr',
+                      {},
+                      h('th', { colspan: 3 }, label),
+                      h('td', { class: 'num' }, value),
+                      h('td', {}),
+                    ),
+                  )
+                : []),
+              c.weight?.status === 'ok'
+                ? h(
+                    'tr',
+                    {},
+                    h('th', { colspan: 3 }, T('rec.weight')),
+                    h(
+                      'td',
+                      { class: 'num', colspan: 2 },
+                      c.weight.perPortion
+                        ? T('rec.weightPer', { total: c.weight.total, per: c.weight.perPortion })
+                        : c.weight.total,
+                    ),
+                  )
+                : null,
             ),
           ),
     );

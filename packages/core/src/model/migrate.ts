@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Version handling. v0.1 writes version 1. Files without optional sections (settings,
+// Version handling. v0.1 writes version 1, v0.2 writes version 2. Files without optional sections (settings,
 // measures, menu) are completed with defaults; files from a newer Saucepenny are refused
 // with a clear message instead of being half-read.
 
@@ -26,8 +26,10 @@ export function migrate(input: unknown): MigrateResult {
       ok: false,
       errors: [{ code: 'newer-version', path: 'version', params: { version: v } }],
     };
-  let migrated = false;
-  const out: Record<string, unknown> = { ...input };
+  // 1 → 2 (v0.2): every new field is optional, so a version 1 file is a valid version 2
+  // file as it stands; it is marked migrated so it is saved back as version 2.
+  let migrated = v < PROJECT_VERSION;
+  const out: Record<string, unknown> = { ...input, version: PROJECT_VERSION };
   if (out.settings === undefined) {
     out.settings = { ...DEFAULT_SETTINGS };
     migrated = true;
