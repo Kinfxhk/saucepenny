@@ -12,3 +12,6 @@ All notable changes to Saucepenny are documented here. The format follows
 - Unit table with constants cited from Hong Kong Cap. 68 (斤, 兩, lb, oz) and NIST
   Handbook 44 (US cup, tablespoon, teaspoon, fluid ounce); exact conversions including
   density and weight per piece.
+- Project data model (ingredients with yield %, density and weight per piece; recipes with
+  nested sub-recipes; menu items; custom measures), strict validation with paths, limits,
+  migration defaults, and hostile-JSON defences (size, depth, prototype keys).
