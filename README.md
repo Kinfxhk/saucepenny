@@ -2,9 +2,6 @@
 
 **English** · [繁體中文](#繁體中文)
 
-> **🚧 In development · 開發中** — v0.1.0 is being built in the open. Nothing is released
-> yet; numbers shown by development builds must not be relied on.
-
 Saucepenny is a free, open-source, offline **recipe costing and menu pricing** tool for
 small restaurants, cha chaan tengs, cafés, home bakers, private kitchens, social
 enterprises, NGO kitchens and cookery classes. Enter what you pay for ingredients, how
@@ -22,6 +19,40 @@ recipes, such as a sauce or a syrup). Saucepenny works out the cost of every rec
   browser.
 - English and Traditional Chinese.
 - Licence: [AGPL-3.0-or-later](LICENSE).
+
+### Use it
+
+- **In the browser:** <https://kinfxhk.github.io/saucepenny/> — nothing to install, and
+  it works offline after the first visit. Your data stays in your browser.
+- **Download:** a static site zip (with SHA-256) is attached to each
+  [release](https://github.com/Kinfxhk/saucepenny/releases).
+- **On your own computer** (Node.js 22+):
+
+```sh
+npm ci
+npm start   # http://127.0.0.1:4893/
+```
+
+- **Docker** (serves only the static site, on your own machine):
+
+```sh
+docker build -t saucepenny .
+docker run --rm -p 127.0.0.1:4893:4893 saucepenny
+```
+
+- **Command line** (same engine, same verified numbers):
+
+```sh
+npm run saucepenny -- cost examples/cha-chaan-teng.json
+npm run saucepenny -- impact examples/cha-chaan-teng.json sugar 15
+```
+
+- **Guide:** [docs/guide.md](docs/guide.md) · calculation rules:
+  [docs/calculation-rules.md](docs/calculation-rules.md) · units and their legal sources:
+  [docs/units.md](docs/units.md).
+- **Examples** (all invented): [examples/](examples/) — a cha chaan teng (叉燒飯 with
+  叉燒 → 叉燒醬 → 糖水, milk tea), a home bakery (cookie gift boxes, cheesecake by the slice
+  or whole) and a social-enterprise lunch box with a senior concession price.
 
 ### Important
 
@@ -66,8 +97,6 @@ If Saucepenny helps you, you can support it at
 
 ## 繁體中文
 
-> **🚧 開發中**：v0.1.0 正在公開開發，尚未發佈；開發版本顯示的數字不可作準。
-
 菜本易（Saucepenny）是免費、開源、可離線使用的**食譜成本及餐牌定價**工具，適合小型
 食肆、茶餐廳、咖啡店、家庭烘焙、私房菜、社企、非政府機構廚房及烹飪課。輸入食材買入價、
 處理後的可用率及食譜（食譜可包含其他食譜，例如醬汁或糖水），菜本易即計出每個食譜的
@@ -81,6 +110,16 @@ If Saucepenny helps you, you can support it at
 - 無需帳戶、無伺服器、無遙測、無月費；供應商價錢只存於你的瀏覽器。
 - 提供英文及繁體中文介面。
 - 授權：[AGPL-3.0-or-later](LICENSE)。
+
+### 使用方法
+
+- **瀏覽器：**<https://kinfxhk.github.io/saucepenny/>，無需安裝，首次瀏覽後可離線使用，資料只存於你的瀏覽器。
+- **下載：**每個 [release](https://github.com/Kinfxhk/saucepenny/releases) 都附有靜態網站 zip 及 SHA-256。
+- **在自己電腦執行**（Node.js 22 或以上）、Docker 及命令列：見上方英文部分的指令。
+- **使用說明：**[docs/guide.zh-Hant.md](docs/guide.zh-Hant.md)；計算規則：
+  [docs/calculation-rules.md](docs/calculation-rules.md)；單位及法例出處：[docs/units.md](docs/units.md)。
+- **範例**（全屬虛構）：[examples/](examples/)：茶餐廳（叉燒飯 → 叉燒 → 叉燒醬 → 糖水、奶茶）、
+  家庭烘焙（曲奇禮盒、芝士蛋糕按件或原個）、社企午餐飯盒（設長者優惠價）。
 
 ### 重要事項
 

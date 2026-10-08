@@ -1,0 +1,176 @@
+{
+  "schema": "saucepenny/project",
+  "version": 1,
+  "name": "社企午餐示範 Demo social-enterprise lunch",
+  "settings": {
+    "currency": "HKD",
+    "serviceChargePercent": "0",
+    "goodPercent": "40",
+    "highPercent": "50"
+  },
+  "measures": [{ "id": "scoop", "name": "飯殼 rice scoop", "amount": "200", "unit": "g" }],
+  "ingredients": [
+    { "id": "rice", "name": "絲苗米 Rice", "packQty": "25", "packUnit": "kg", "price": "245" },
+    {
+      "id": "chicken",
+      "name": "雞髀肉 Chicken thigh",
+      "packQty": "2",
+      "packUnit": "kg",
+      "price": "78",
+      "yieldPercent": "85"
+    },
+    {
+      "id": "veg",
+      "name": "時菜 Seasonal greens",
+      "packQty": "1",
+      "packUnit": "catty",
+      "price": "12",
+      "yieldPercent": "75"
+    },
+    {
+      "id": "carrot",
+      "name": "甘筍 Carrot",
+      "packQty": "1",
+      "packUnit": "catty",
+      "price": "8",
+      "yieldPercent": "85"
+    },
+    {
+      "id": "oil",
+      "name": "粟米油 Corn oil",
+      "packQty": "5",
+      "packUnit": "l",
+      "price": "95",
+      "density": "0.92"
+    },
+    {
+      "id": "soy",
+      "name": "生抽 Light soy sauce",
+      "packQty": "1.9",
+      "packUnit": "l",
+      "price": "38",
+      "density": "1.2"
+    },
+    {
+      "id": "dark-soy",
+      "name": "老抽 Dark soy sauce",
+      "packQty": "500",
+      "packUnit": "ml",
+      "price": "15",
+      "density": "1.25"
+    },
+    {
+      "id": "sugar",
+      "name": "片糖 Slab sugar",
+      "packQty": "1",
+      "packUnit": "catty",
+      "price": "10"
+    },
+    {
+      "id": "ginger",
+      "name": "薑 Ginger",
+      "packQty": "1",
+      "packUnit": "tael",
+      "price": "2.5",
+      "yieldPercent": "80"
+    },
+    { "id": "water", "name": "水 Water", "packQty": "1", "packUnit": "l", "price": "0" },
+    {
+      "id": "lunchbox",
+      "name": "紙飯盒 Paper lunch box",
+      "packQty": "100",
+      "packUnit": "piece",
+      "price": "120"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "cooked-rice",
+      "name": "白飯 Cooked rice",
+      "yieldQty": "9",
+      "yieldUnit": "kg",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "rice" }, "qty": "4", "unit": "kg" },
+        { "ref": { "kind": "ingredient", "id": "water" }, "qty": "5.5", "unit": "l" }
+      ],
+      "note": "4 kg of raw rice cooks to about 9 kg."
+    },
+    {
+      "id": "soy-sauce-mix",
+      "name": "豉油汁 Soy braising sauce",
+      "yieldQty": "1",
+      "yieldUnit": "l",
+      "density": "1.15",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "soy" }, "qty": "400", "unit": "ml" },
+        { "ref": { "kind": "ingredient", "id": "dark-soy" }, "qty": "100", "unit": "ml" },
+        { "ref": { "kind": "ingredient", "id": "sugar" }, "qty": "3", "unit": "tael" },
+        { "ref": { "kind": "ingredient", "id": "ginger" }, "qty": "1", "unit": "tael" },
+        { "ref": { "kind": "ingredient", "id": "water" }, "qty": "500", "unit": "ml" }
+      ]
+    },
+    {
+      "id": "soy-chicken",
+      "name": "豉油雞 Soy sauce chicken",
+      "yieldQty": "20",
+      "yieldUnit": "portion",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "chicken" }, "qty": "3", "unit": "kg" },
+        {
+          "ref": { "kind": "recipe", "id": "soy-sauce-mix" },
+          "qty": "600",
+          "unit": "ml",
+          "wastePercent": "30"
+        }
+      ]
+    },
+    {
+      "id": "stir-fry-veg",
+      "name": "炒雜菜 Stir-fried vegetables",
+      "yieldQty": "5",
+      "yieldUnit": "kg",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "veg" }, "qty": "6", "unit": "catty" },
+        { "ref": { "kind": "ingredient", "id": "carrot" }, "qty": "2", "unit": "catty" },
+        { "ref": { "kind": "ingredient", "id": "oil" }, "qty": "8", "unit": "tbsp" },
+        { "ref": { "kind": "ingredient", "id": "ginger" }, "qty": "1", "unit": "tael" }
+      ]
+    },
+    {
+      "id": "lunch-box",
+      "name": "豉油雞飯盒 Soy chicken lunch box",
+      "yieldQty": "1",
+      "yieldUnit": "portion",
+      "lines": [
+        { "ref": { "kind": "recipe", "id": "cooked-rice" }, "qty": "1.5", "unit": "measure:scoop" },
+        { "ref": { "kind": "recipe", "id": "soy-chicken" }, "qty": "1", "unit": "portion" },
+        { "ref": { "kind": "recipe", "id": "stir-fry-veg" }, "qty": "150", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "lunchbox" }, "qty": "1", "unit": "piece" }
+      ]
+    }
+  ],
+  "menu": [
+    {
+      "id": "m-standard",
+      "name": "飯盒（標準價）Lunch box (standard)",
+      "recipeId": "lunch-box",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "38",
+      "priceIncludesService": false,
+      "targetPercent": "40",
+      "rounding": "1"
+    },
+    {
+      "id": "m-concession",
+      "name": "飯盒（長者優惠）Lunch box (senior concession)",
+      "recipeId": "lunch-box",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "20",
+      "priceIncludesService": false,
+      "targetPercent": "60",
+      "rounding": "1"
+    }
+  ]
+}

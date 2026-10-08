@@ -1,0 +1,180 @@
+{
+  "schema": "saucepenny/project",
+  "version": 1,
+  "name": "家庭烘焙示範 Demo home bakery",
+  "settings": {
+    "currency": "HKD",
+    "serviceChargePercent": "0",
+    "goodPercent": "30",
+    "highPercent": "40"
+  },
+  "measures": [],
+  "ingredients": [
+    {
+      "id": "flour",
+      "name": "低筋麵粉 Cake flour",
+      "packQty": "1",
+      "packUnit": "kg",
+      "price": "18",
+      "density": "0.53"
+    },
+    {
+      "id": "butter",
+      "name": "無鹽牛油 Unsalted butter",
+      "packQty": "1",
+      "packUnit": "lb",
+      "price": "52",
+      "density": "0.91"
+    },
+    {
+      "id": "icing-sugar",
+      "name": "糖粉 Icing sugar",
+      "packQty": "500",
+      "packUnit": "g",
+      "price": "14",
+      "density": "0.56"
+    },
+    {
+      "id": "sugar",
+      "name": "砂糖 Caster sugar",
+      "packQty": "1",
+      "packUnit": "kg",
+      "price": "15",
+      "density": "0.85"
+    },
+    {
+      "id": "egg",
+      "name": "雞蛋 Egg",
+      "packQty": "12",
+      "packUnit": "piece",
+      "price": "28",
+      "pieceWeight": "50"
+    },
+    {
+      "id": "vanilla",
+      "name": "雲呢拿香油 Vanilla extract",
+      "packQty": "60",
+      "packUnit": "ml",
+      "price": "45"
+    },
+    {
+      "id": "cream-cheese",
+      "name": "忌廉芝士 Cream cheese",
+      "packQty": "250",
+      "packUnit": "g",
+      "price": "32"
+    },
+    {
+      "id": "digestive",
+      "name": "消化餅 Digestive biscuits",
+      "packQty": "400",
+      "packUnit": "g",
+      "price": "22"
+    },
+    {
+      "id": "cream",
+      "name": "淡忌廉 Whipping cream",
+      "packQty": "1",
+      "packUnit": "l",
+      "price": "68",
+      "density": "1.0"
+    },
+    {
+      "id": "box",
+      "name": "曲奇盒 Cookie box",
+      "packQty": "50",
+      "packUnit": "piece",
+      "price": "150"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "cookies",
+      "name": "牛油曲奇 Butter cookies",
+      "yieldQty": "40",
+      "yieldUnit": "piece",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "butter" }, "qty": "250", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "icing-sugar" }, "qty": "0.5", "unit": "cup" },
+        { "ref": { "kind": "ingredient", "id": "flour" }, "qty": "300", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "egg" }, "qty": "1", "unit": "piece" },
+        { "ref": { "kind": "ingredient", "id": "vanilla" }, "qty": "1", "unit": "tsp" }
+      ],
+      "note": "About 5% of cookies break; the line waste on butter and flour covers trimmings."
+    },
+    {
+      "id": "cookie-box",
+      "name": "曲奇禮盒（12 塊）Cookie gift box (12)",
+      "yieldQty": "1",
+      "yieldUnit": "portion",
+      "lines": [
+        {
+          "ref": { "kind": "recipe", "id": "cookies" },
+          "qty": "12",
+          "unit": "piece",
+          "wastePercent": "5"
+        },
+        { "ref": { "kind": "ingredient", "id": "box" }, "qty": "1", "unit": "piece" }
+      ]
+    },
+    {
+      "id": "base",
+      "name": "餅底 Biscuit base",
+      "yieldQty": "350",
+      "yieldUnit": "g",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "digestive" }, "qty": "250", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "butter" }, "qty": "100", "unit": "g" }
+      ]
+    },
+    {
+      "id": "cheesecake",
+      "name": "紐約芝士蛋糕（8 件）New York cheesecake (8 slices)",
+      "yieldQty": "8",
+      "yieldUnit": "portion",
+      "lines": [
+        { "ref": { "kind": "recipe", "id": "base" }, "qty": "350", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "cream-cheese" }, "qty": "750", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "sugar" }, "qty": "0.75", "unit": "cup" },
+        { "ref": { "kind": "ingredient", "id": "egg" }, "qty": "3", "unit": "piece" },
+        { "ref": { "kind": "ingredient", "id": "cream" }, "qty": "120", "unit": "ml" },
+        { "ref": { "kind": "ingredient", "id": "vanilla" }, "qty": "2", "unit": "tsp" }
+      ]
+    }
+  ],
+  "menu": [
+    {
+      "id": "m-box",
+      "name": "曲奇禮盒 Cookie gift box",
+      "recipeId": "cookie-box",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "88",
+      "priceIncludesService": false,
+      "targetPercent": "30",
+      "rounding": "ending-8"
+    },
+    {
+      "id": "m-slice",
+      "name": "芝士蛋糕一件 Cheesecake slice",
+      "recipeId": "cheesecake",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "38",
+      "priceIncludesService": false,
+      "targetPercent": "30",
+      "rounding": "1"
+    },
+    {
+      "id": "m-whole",
+      "name": "原個芝士蛋糕 Whole cheesecake",
+      "recipeId": "cheesecake",
+      "portionQty": "8",
+      "portionUnit": "portion",
+      "price": "268",
+      "priceIncludesService": false,
+      "targetPercent": "30",
+      "rounding": "ending-8"
+    }
+  ]
+}
