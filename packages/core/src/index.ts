@@ -5,5 +5,5 @@ export * from './units/index';
 export * from './model/index';
 export * from './graph/index';
 export * from './cost/index';
-export { Checker } from './check/index';
+export { Checker, isValidSuggestion } from './check/index';
 export * from './api';

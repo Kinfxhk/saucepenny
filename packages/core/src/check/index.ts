@@ -12,7 +12,18 @@
 
 import type { Measure, Project, Recipe, UnitRef } from '../model/index';
 import { LIMITS } from '../model/limits';
-import { add, div, eq, mul, rat, sub, ZERO, type Rational } from '../num/index';
+import {
+  add,
+  cmp,
+  div,
+  eq,
+  mul,
+  rat,
+  sub,
+  ZERO,
+  type PriceRounding,
+  type Rational,
+} from '../num/index';
 import { UNITS, type Dimension } from '../units/table';
 
 type Kind = Dimension | 'portion';
@@ -237,3 +248,67 @@ export class Checker {
 }
 
 export const sameNumber = eq;
+
+export interface RecomputedMenu {
+  portionCost: Rational;
+  netPrice: Rational;
+  foodCost: Rational | null;
+  grossProfit: Rational | null;
+  band: 'good' | 'watch' | 'high' | null;
+  /** the raw (unrounded) listed price that meets the target exactly */
+  rawSuggested: Rational;
+}
+
+/** Net price (without service charge), computed as price × 1/(1 + s). */
+export function netPriceOf(price: Rational, includes: boolean, serviceCharge: Rational): Rational {
+  return includes ? mul(price, div(rat(1n), add(rat(1n), serviceCharge))) : price;
+}
+
+/**
+ * Is `s` an acceptable suggested price for `raw` under `rule`? It must be on the rule's grid,
+ * not below `raw`, and less than one grid step above it (so it is the smallest such price).
+ * This checks the result instead of repeating the rounding code.
+ */
+export function isValidSuggestion(s: Rational, raw: Rational, rule: PriceRounding): boolean {
+  if (raw.n === 0n) return s.n === 0n;
+  if (cmp(s, raw) < 0) return false;
+  if (rule === 'ending-8') {
+    if (s.d !== 1n || ((s.n % 10n) + 10n) % 10n !== 8n) return false;
+    return cmp(sub(s, rat(10n)), raw) < 0;
+  }
+  const step = { none: rat(1n, 100n), '0.1': rat(1n, 10n), '0.5': rat(1n, 2n), '1': rat(1n) }[rule];
+  if (div(s, step).d !== 1n) return false;
+  return cmp(sub(s, step), raw) < 0;
+}
+
+export function recomputeMenu(
+  checker: Checker,
+  project: Project,
+  itemId: string,
+): RecomputedMenu | CheckFailure {
+  const item = project.menu.get(itemId)!;
+  const portionCost = checker.amountCost(item.recipeId, item.portionQty, item.portionUnit);
+  if (typeof portionCost === 'string') return portionCost;
+  const sc = project.settings.serviceCharge;
+  const netPrice = netPriceOf(item.price, item.priceIncludesService, sc);
+  const zero = netPrice.n === 0n;
+  const foodCost = zero ? null : div(portionCost, netPrice);
+  // Band by cross-multiplication: cost ≤ good × net → good; cost > high × net → high.
+  let band: RecomputedMenu['band'] = null;
+  if (!zero) {
+    if (cmp(portionCost, mul(project.settings.good, netPrice)) <= 0) band = 'good';
+    else if (cmp(portionCost, mul(project.settings.high, netPrice)) > 0) band = 'high';
+    else band = 'watch';
+  }
+  const rawSuggested = item.priceIncludesService
+    ? div(mul(portionCost, add(rat(1n), sc)), item.target)
+    : div(portionCost, item.target);
+  return {
+    portionCost,
+    netPrice,
+    foodCost,
+    grossProfit: zero ? null : sub(netPrice, portionCost),
+    band,
+    rawSuggested,
+  };
+}

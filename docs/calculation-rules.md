@@ -44,8 +44,22 @@ our own words. Every number is an exact fraction inside the program; rounding ha
 9. **Errors are never turned into zero.** Saucepenny refuses to give a number and says
    why when: units cannot be converted (pieces without a weight per piece, weight ↔ volume
    without a density, portions of a recipe that yields litres); a yield % is 0 or above
-   100; a recipe yields 0; a net price is 0; or recipes use each other in a circle (the
-   whole circle is listed).
+   100; a recipe yields 0; or recipes use each other in a circle (the whole circle is
+   listed). If a menu price is 0, food cost % and gross profit are shown as "—" with the
+   reason (the suggested price is still given).
+
+10. **Colour bands:** food cost % at or below the "good" setting (default 30%) is good;
+    above the "high" setting (default 35%) is high; in between is watch. The boundaries
+    themselves count as good and watch respectively (30% is good, 35% is watch).
+11. **Price change impact:** Saucepenny recomputes everything with the new price and
+    lists every recipe (cost of one batch) and menu item (cost per portion) whose cost
+    changes, including those that use the ingredient only through a sub-recipe. The list is
+    checked against the independent checker's own before/after.
+12. **Scaling:** a different batch size multiplies every line by new yield ÷ old yield.
+    "How much can I make with what I have" = available amount ÷ the amount of that
+    ingredient needed per yield unit (through sub-recipes, including line waste %). The
+    ingredient's usable yield % is already part of its price, so it does not reduce the
+    amount here. If the recipe does not use the ingredient, the answer is "not used".
 
 ## Number input
 

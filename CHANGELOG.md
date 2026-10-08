@@ -18,4 +18,7 @@ All notable changes to Saucepenny are documented here. The format follows
 - Costing engine (recursive, memoised) and an independent checker that expands every
   recipe into raw ingredient packs; numbers are shown only when both agree exactly.
   Tarjan cycle detection with the full cycle path, nesting limit of 20 levels.
+- Menu pricing: cost per portion, net price without service charge, food cost %, gross
+  profit, colour bands, suggested price rounded up and the real food cost % at it; price
+  change impact through sub-recipes; batch scaling and "how much can I make".
 - Written calculation rules (docs/calculation-rules.md).
