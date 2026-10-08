@@ -103,7 +103,7 @@ let canIngredient = '';
 let canQty = '';
 let canUnit: UnitRef = 'kg';
 let note = '';
-let persistStatus: PersistStatus | 'checking' = 'checking';
+let persistStatus: PersistStatus | 'checking' | 'not-asked' = 'checking';
 let persistAsked = false;
 let backup = loadBackupState();
 /** Price and pack of each ingredient as last shown, to keep the old price on a change. */
@@ -173,6 +173,23 @@ async function askPersist(force = false): Promise<void> {
   if (persistStatus === 'persisted' || (persistAsked && !force)) return;
   persistAsked = true;
   persistStatus = await ensurePersisted(navigator.storage);
+  updatePersistStatus();
+}
+
+/** Before the first change: report the state without asking (the bundled example is not theirs). */
+async function showPersisted(): Promise<void> {
+  const st = navigator.storage;
+  let now: typeof persistStatus = 'not-asked';
+  if (!st || typeof st.persist !== 'function') now = 'unsupported';
+  else {
+    try {
+      if (typeof st.persisted === 'function' && (await st.persisted())) now = 'persisted';
+    } catch {
+      // keep 'not-asked'
+    }
+  }
+  if (persistAsked) return; // a real request already answered
+  persistStatus = now;
   updatePersistStatus();
 }
 
@@ -2178,6 +2195,7 @@ function setTab(next: Tab): void {
 
 async function start(): Promise<void> {
   const saved = await loadState();
+  if (!saved || typeof saved !== 'object') void showPersisted(); // nothing of theirs yet
   if (saved && typeof saved === 'object') {
     void askPersist(); // the user has their own data here
     const r = validateProject(saved);

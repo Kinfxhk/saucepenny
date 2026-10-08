@@ -187,6 +187,8 @@ const en = {
   'persist.unsupported':
     'This browser cannot promise to keep data. Save a .json backup now and then.',
   'persist.checking': 'Checking storage…',
+  'persist.not-asked':
+    'After your first change, Saucepenny will ask the browser to keep your project even when space runs low.',
   'persist.ask': 'Ask the browser again',
   'backup.never': 'No backup file saved from this device yet.',
   'backup.last': 'Last backup file: {d}',
@@ -383,6 +385,7 @@ const zh: Record<UiKey, string> = {
   'persist.not-persisted': '裝置空間不足時，這個瀏覽器可能會清除項目。請不時另存 .json 備份。',
   'persist.unsupported': '這個瀏覽器無法保證保留資料。請不時另存 .json 備份。',
   'persist.checking': '正在檢查儲存…',
+  'persist.not-asked': '你第一次修改後，菜本易會向瀏覽器申請：即使空間不足亦保留你的項目。',
   'persist.ask': '再向瀏覽器申請',
   'backup.never': '這部裝置未曾儲存備份檔。',
   'backup.last': '上次備份檔：{d}',

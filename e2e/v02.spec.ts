@@ -207,9 +207,28 @@ test('persistent storage: granted', async ({ page }) => {
   });
   await open(page);
   await page.locator('#tab-data').click();
+  // Nothing of the user's yet (bundled example): say what will happen, do not ask.
+  await expect(page.locator('#persist-status')).toHaveAttribute('data-status', 'not-asked');
+  await expect(page.locator('#persist-status')).toContainText('first change');
   await typeInto(page, '#project-name', 'My shop');
   await expect(page.locator('#persist-status')).toHaveAttribute('data-status', 'persisted');
   await expect(page.locator('#persist-again')).toBeHidden();
+});
+
+test('persistent storage: already granted shows as kept before any change', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'storage', {
+      value: {
+        persisted: async () => true,
+        persist: async () => {
+          throw new Error('must not be asked');
+        },
+      },
+    });
+  });
+  await open(page);
+  await page.locator('#tab-data').click();
+  await expect(page.locator('#persist-status')).toHaveAttribute('data-status', 'persisted');
 });
 
 test('persistent storage: refused, then asked again', async ({ page }) => {
@@ -300,4 +319,17 @@ test('a line counted at 0% is a pinch: no cost, marked in the share column', asy
   await expect(page.locator('#line-table tbody tr[data-line="2"] .line-share')).toContainText(
     'pinch, not costed',
   );
+});
+
+test('the recipe table fits a 1280 px wide window (no sideways scrolling)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await open(page);
+  await openRecipe(page, 'char-siu-rice');
+  const panel = (await page.locator('#panel-recipes').boundingBox())!;
+  const table = (await page.locator('#line-table').boundingBox())!;
+  expect(table.x + table.width).toBeLessThanOrEqual(panel.x + panel.width);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });

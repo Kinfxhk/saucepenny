@@ -6,6 +6,16 @@ All notable changes to Saucepenny are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-08
+
+### Fixed
+
+- The recipe table (with the new Cost % column) no longer runs past the edge of the page
+  on a 1280-pixel-wide window; a browser test now checks there is no sideways scrolling.
+- Before your first change, the Data tab said "Checking storage…" forever. It now says
+  that Saucepenny will ask the browser to keep your project after your first change (or
+  that storage is already kept), without asking for the bundled example.
+
 ## [0.2.0] - 2026-10-08
 
 Improvements from what users of other recipe-costing tools ask for most. 根據其他食譜

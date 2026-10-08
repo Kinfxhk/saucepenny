@@ -266,7 +266,7 @@ tfoot td {
 }
 .split {
   display: grid;
-  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
   gap: 1rem;
 }
 @media (max-width: 48rem) {
@@ -427,4 +427,15 @@ td[data-band='high'] {
 }
 #ingredient-table input.num {
   width: 5.5rem;
+}
+
+/* v0.2: the line table gained a Cost % column; keep it inside the card */
+#line-table input.num {
+  width: 5rem;
+}
+#line-table select {
+  max-width: 12rem;
+}
+#recipe-weight {
+  white-space: normal;
 }
