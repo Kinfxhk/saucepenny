@@ -42,16 +42,37 @@ function toBigIntStrict(x: number): bigint {
 export const ZERO: Rational = Object.freeze({ n: 0n, d: 1n });
 export const ONE: Rational = Object.freeze({ n: 1n, d: 1n });
 
-export const add = (a: Rational, b: Rational): Rational =>
-  a.d === b.d ? rat(a.n + b.n, a.d) : rat(a.n * b.d + b.n * a.d, a.d * b.d);
+/**
+ * a + b in lowest terms. Uses Knuth's method (TAOCP vol. 2, 4.5.1) so the gcds are taken of
+ * small numbers: with g = gcd(a.d, b.d), the sum is t / (a.d/g · b.d) reduced by gcd(t, g)
+ * only.
+ */
+export function add(a: Rational, b: Rational): Rational {
+  if (a.n === 0n) return b;
+  if (b.n === 0n) return a;
+  if (a.d === 1n && b.d === 1n) return rat(a.n + b.n, 1n);
+  const g = gcd(a.d, b.d);
+  if (g === 1n) return { n: a.n * b.d + b.n * a.d, d: a.d * b.d }; // already lowest terms
+  if (a.d === b.d) return rat(a.n + b.n, a.d);
+  const t = a.n * (b.d / g) + b.n * (a.d / g);
+  if (t === 0n) return ZERO;
+  const g2 = gcd(t, g);
+  return { n: t / g2, d: (a.d / g) * (b.d / g2) };
+}
 export const sub = (a: Rational, b: Rational): Rational => add(a, neg(b));
-export const mul = (a: Rational, b: Rational): Rational => rat(a.n * b.n, a.d * b.d);
+/** a × b in lowest terms, cancelling crosswise first (small gcds). */
+export function mul(a: Rational, b: Rational): Rational {
+  if (a.n === 0n || b.n === 0n) return ZERO;
+  const g1 = gcd(a.n, b.d);
+  const g2 = gcd(b.n, a.d);
+  return { n: (a.n / g1) * (b.n / g2), d: (a.d / g2) * (b.d / g1) };
+}
 export const neg = (a: Rational): Rational => (a.n === 0n ? ZERO : { n: -a.n, d: a.d });
 
 /** a / b. Throws on division by zero; callers must check and report a user error first. */
 export function div(a: Rational, b: Rational): Rational {
   if (b.n === 0n) throw new RangeError('division by zero');
-  return rat(a.n * b.d, a.d * b.n);
+  return b.n < 0n ? mul(a, { n: -b.d, d: -b.n }) : mul(a, { n: b.d, d: b.n });
 }
 
 export const sum = (xs: Iterable<Rational>): Rational => {

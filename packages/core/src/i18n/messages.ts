@@ -59,7 +59,7 @@ const EN: Record<ErrorCode, Msg> = {
     'These units cannot be converted (for example portions of a recipe that yields litres).',
   'zero-yield': () => 'The recipe yields 0.',
   'zero-price': () => 'The price is 0, so a food cost % cannot be worked out.',
-  'recipe-error': (p) => `The sub-recipe "${p.recipe}" has a problem; fix it first.`,
+  'recipe-error': (p) => `The recipe "${p.recipe}" has a problem; fix it first.`,
 };
 
 const ZH: Record<ErrorCode, Msg> = {
@@ -103,7 +103,7 @@ const ZH: Record<ErrorCode, Msg> = {
   'incompatible-units': () => '這些單位無法互換（例如以「份」計一個以公升為產出量的食譜）。',
   'zero-yield': () => '食譜產出量為 0。',
   'zero-price': () => '售價為 0，無法計算食材成本率。',
-  'recipe-error': (p) => `子食譜「${p.recipe}」有問題，請先修正。`,
+  'recipe-error': (p) => `食譜「${p.recipe}」有問題，請先修正。`,
 };
 
 const SECTION: Record<Lang, Record<string, string>> = {

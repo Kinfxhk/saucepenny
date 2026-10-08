@@ -46,6 +46,39 @@ describe('rational arithmetic properties (5,000 runs each)', () => {
       RUNS,
     );
   });
+  it('fast add, sub, mul and div equal the textbook formulas and stay in lowest terms', () => {
+    // denominators that often share factors, to reach every branch of Knuth's method
+    const shared = fc
+      .tuple(
+        bigintArb,
+        fc.constantFrom(1n, 2n, 6n, 12n, 100n, 360n, 45359237n),
+        fc.bigInt({ min: 1n, max: 10n ** 6n }),
+      )
+      .map(([n, base, k]) => rat(n, base * k));
+    const lowest = (r: Rational) => {
+      let a = r.n < 0n ? -r.n : r.n;
+      let b = r.d;
+      while (b) [a, b] = [b, a % b];
+      return r.d > 0n && (r.n === 0n ? r.d === 1n : a === 1n);
+    };
+    fc.assert(
+      fc.property(fc.oneof(ratArb, shared), fc.oneof(ratArb, shared), (a, b) => {
+        const s = add(a, b);
+        const p = mul(a, b);
+        const okDiv = b.n === 0n || eq(div(a, b), rat(a.n * b.d, a.d * b.n));
+        return (
+          eq(s, rat(a.n * b.d + b.n * a.d, a.d * b.d)) &&
+          eq(sub(a, b), rat(a.n * b.d - b.n * a.d, a.d * b.d)) &&
+          eq(p, rat(a.n * b.n, a.d * b.d)) &&
+          okDiv &&
+          lowest(s) &&
+          lowest(p) &&
+          (b.n === 0n || lowest(div(a, b)))
+        );
+      }),
+      { numRuns: 20000 },
+    );
+  });
   it('unique representation: equal values are structurally equal', () => {
     fc.assert(
       fc.property(ratArb, fc.bigInt({ min: 1n, max: 10n ** 9n }), (r, k) =>
@@ -264,8 +297,8 @@ const NUM_MUTANTS: Mutant[] = [
   {
     name: 'same-denominator addition adds denominators',
     file: 'num/rational.ts',
-    from: 'a.d === b.d ? rat(a.n + b.n, a.d)',
-    to: 'a.d === b.d ? rat(a.n + b.n, a.d + b.d)',
+    from: 'if (a.d === b.d) return rat(a.n + b.n, a.d);',
+    to: 'if (a.d === b.d) return rat(a.n + b.n, a.d + b.d);',
   },
   {
     name: 'full-width digits not folded',

@@ -7,9 +7,10 @@
 import { Checker, isValidSuggestion, netPriceOf, recomputeMenu } from './check/index';
 import {
   costRecipes,
+  ingredientCost,
   maxYield,
   priceImpact,
-  priceMenu,
+  priceItem,
   withPrice,
   type ImpactRow,
   type MenuCost,
@@ -18,6 +19,7 @@ import {
 import { resolveUnit, toBaseOf } from './cost/units';
 import type { Project, ProjectError, UnitRef } from './model/index';
 import { cmp, div, eq, mul, rat, type Rational } from './num/index';
+import { UNITS, type UnitId } from './units/index';
 
 export type VerifiedRecipe =
   | {
@@ -66,6 +68,40 @@ export function verifiedRecipes(project: Project): Map<string, VerifiedRecipe> {
   const out = new Map<string, VerifiedRecipe>();
   for (const id of project.recipes.keys())
     out.set(id, verifyRecipe(project, id, engine.get(id)!, checker));
+  return out;
+}
+
+// ---- Ingredient unit cost ------------------------------------------------------------
+
+export type VerifiedUnitCost =
+  { status: 'ok'; unit: UnitId; cost: Rational } | { status: 'mismatch'; detail: string };
+
+const DISPLAY_UNIT = { mass: 'kg', volume: 'l', count: 'piece' } as const;
+
+/** Usable cost per kg, per litre or per piece of each ingredient (yield % included). */
+export function verifiedIngredientCosts(
+  project: Project,
+  only?: Iterable<string>,
+): Map<string, VerifiedUnitCost> {
+  const checker = new Checker(project);
+  const out = new Map<string, VerifiedUnitCost>();
+  for (const id of only ?? project.ingredients.keys()) {
+    const ing = project.ingredients.get(id)!;
+    const e = ingredientCost(ing, project);
+    if (e.dim === 'portion') {
+      out.set(id, { status: 'mismatch', detail: 'portion' });
+      continue;
+    }
+    const unit: UnitId = DISPLAY_UNIT[e.dim];
+    const cost = mul(e.perBase, UNITS[unit].factor);
+    const chk = checker.ingredientUnitCost(id, unit);
+    out.set(
+      id,
+      typeof chk !== 'string' && eq(chk, cost)
+        ? { status: 'ok', unit, cost }
+        : { status: 'mismatch', detail: 'unit cost' },
+    );
+  }
   return out;
 }
 
@@ -126,17 +162,29 @@ export interface VerifiedProject {
   menu: Map<string, VerifiedMenu>;
 }
 
-/** Cost and price everything, verified. This is what the UI and CLI display. */
-export function verifiedProject(project: Project): VerifiedProject {
-  const engine = costRecipes(project);
+export interface Subset {
+  recipes?: Iterable<string>;
+  menu?: Iterable<string>;
+}
+
+/**
+ * Cost and price everything (or just a subset, for a fast UI update), verified. This is
+ * what the UI and CLI display.
+ */
+export function verifiedProject(project: Project, only?: Subset): VerifiedProject {
+  const recipeIds = only ? [...(only.recipes ?? [])] : [...project.recipes.keys()];
+  const menuIds = only ? [...(only.menu ?? [])] : [...project.menu.keys()];
+  const needed = new Set(recipeIds);
+  for (const id of menuIds) needed.add(project.menu.get(id)!.recipeId);
+  const engine = costRecipes(project, needed);
   const checker = new Checker(project);
   const recipes = new Map<string, VerifiedRecipe>();
-  for (const id of project.recipes.keys())
-    recipes.set(id, verifyRecipe(project, id, engine.get(id)!, checker));
-  const menuCosts = priceMenu(project, engine);
+  for (const id of recipeIds) recipes.set(id, verifyRecipe(project, id, engine.get(id)!, checker));
   const menu = new Map<string, VerifiedMenu>();
-  for (const id of project.menu.keys())
-    menu.set(id, verifyMenuItem(project, id, menuCosts.get(id)!, checker));
+  for (const id of menuIds) {
+    const item = project.menu.get(id)!;
+    menu.set(id, verifyMenuItem(project, id, priceItem(item, project, engine), checker));
+  }
   return { recipes, menu };
 }
 

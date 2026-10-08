@@ -26,4 +26,12 @@ All notable changes to Saucepenny are documented here. The format follows
   recipe and menu CSV exports; bilingual error messages.
 - Command line: `saucepenny cost | check | impact`, printing the same verified text as the
   core report.
+- Web app: ingredient table with real cost per kg/L/piece, recipe editor with live cost
+  and share per line, expandable sub-recipes, scaling and "how much can I make", menu
+  table with colour bands and suggested prices, price change impact, CSV import/export,
+  printable cost cards, IndexedDB storage with "delete all data", offline service worker,
+  English and Traditional Chinese, dark mode and large text.
+- Faster exact arithmetic (Knuth's gcd-saving addition and cross-cancelling
+  multiplication); editing one line in a 1,000-ingredient × 500-recipe project updates in
+  about 20 ms in headless Chrome.
 - Written calculation rules (docs/calculation-rules.md).

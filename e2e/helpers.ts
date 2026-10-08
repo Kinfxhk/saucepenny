@@ -21,3 +21,29 @@ export async function open(page: Page, path = '/'): Promise<void> {
   await page.goto(path);
   await page.locator('body[data-ready="true"]').waitFor();
 }
+
+/** Accept confirm() dialogs automatically. */
+export function acceptDialogs(page: Page): void {
+  page.on('dialog', (d) => void d.accept());
+}
+
+/** Start every test with empty storage (but keep it across reloads inside a test). */
+export async function freshStorage(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('e2e-init')) {
+      sessionStorage.setItem('e2e-init', '1');
+      localStorage.clear();
+      indexedDB.deleteDatabase('saucepenny');
+    }
+  });
+}
+
+/** Clear a field and type into it with the keyboard (works for Chinese text too). */
+export async function typeInto(page: Page, selector: string, text: string): Promise<void> {
+  const el = page.locator(selector);
+  await el.click();
+  await el.press('ControlOrMeta+a');
+  await el.press('Delete');
+  await page.keyboard.type(text);
+  await el.press('Tab');
+}

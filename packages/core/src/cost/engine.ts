@@ -46,7 +46,11 @@ export function ingredientCost(ing: Ingredient, project: Project): IngredientCos
 
 const ONE = rat(1n);
 
-export function costRecipes(project: Project): Map<string, RecipeCost> {
+/**
+ * Cost every recipe, or only `only` (and whatever they use). The result may contain more
+ * recipes than asked for.
+ */
+export function costRecipes(project: Project, only?: Iterable<string>): Map<string, RecipeCost> {
   const graph = buildGraph(project.recipes.values());
   const info = analyse(graph);
   const memo = new Map<string, RecipeCost>();
@@ -154,7 +158,7 @@ export function costRecipes(project: Project): Map<string, RecipeCost> {
     };
   };
 
-  for (const id of project.recipes.keys()) costOf(id);
+  for (const id of only ?? project.recipes.keys()) costOf(id);
   return memo;
 }
 

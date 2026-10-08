@@ -620,3 +620,50 @@ describe('menu checker mutation testing', () => {
       expect(noticed).toBe(true);
     });
 });
+
+describe('ingredient unit cost (per kg, per litre, per piece), verified', () => {
+  it('pork 68 per catty at 90% → per kg; tea 80 per lb; egg per piece; soy per litre', async () => {
+    const { verifiedIngredientCosts } = await import('../src/api');
+    const v = verifiedIngredientCosts(compile(sampleStored()));
+    const get = (id: string) => {
+      const x = v.get(id)!;
+      if (x.status !== 'ok') throw new Error(id);
+      return [x.unit, toFraction(x.cost)];
+    };
+    expect(get('pork')).toEqual([
+      'kg',
+      toFraction(div(rat(68000n), mul(dec('604.78982'), dec('0.9')))),
+    ]);
+    expect(get('tea')).toEqual(['kg', toFraction(div(rat(80000n), dec('453.59237')))]);
+    expect(get('egg')).toEqual(['piece', '3/2']);
+    expect(get('soy')).toEqual(['l', '30']);
+  });
+});
+
+describe('verifying a subset (fast UI updates) gives the same results as verifying everything', () => {
+  it('on the sample and on random projects', () => {
+    fc.assert(
+      fc.property(projectArb({ maxRecipes: 6 }), fc.nat(), (stored, pick) => {
+        const p = compile(stored);
+        const ids = [...p.recipes.keys()];
+        const one = ids[pick % ids.length]!;
+        const full = verifiedProject(p);
+        const part = verifiedProject(p, { recipes: [one] });
+        return (
+          part.recipes.size === 1 &&
+          JSON.stringify(part.recipes.get(one), (_k, v: unknown) =>
+            typeof v === 'bigint' ? v.toString() : v,
+          ) ===
+            JSON.stringify(full.recipes.get(one), (_k, v: unknown) =>
+              typeof v === 'bigint' ? v.toString() : v,
+            )
+        );
+      }),
+      { numRuns: Math.ceil(runs / 4) },
+    );
+    const p = compile(sampleStored());
+    const part = verifiedProject(p, { menu: ['m2'] });
+    expect(part.recipes.size).toBe(0);
+    expect(part.menu.get('m2')!.status).toBe('ok');
+  });
+});

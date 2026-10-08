@@ -1,0 +1,219 @@
+{
+  "schema": "saucepenny/project",
+  "version": 1,
+  "name": "示範茶餐廳 Demo cha chaan teng",
+  "settings": {
+    "currency": "HKD",
+    "serviceChargePercent": "10",
+    "goodPercent": "30",
+    "highPercent": "35"
+  },
+  "measures": [{ "id": "scoop", "name": "湯殼 soup scoop", "amount": "120", "unit": "ml" }],
+  "ingredients": [
+    {
+      "id": "pork-shoulder",
+      "name": "梅頭肉 Pork shoulder",
+      "packQty": "1",
+      "packUnit": "catty",
+      "price": "62",
+      "yieldPercent": "88",
+      "note": "Invented price."
+    },
+    { "id": "rice", "name": "白米 Rice", "packQty": "5", "packUnit": "kg", "price": "58" },
+    { "id": "sugar", "name": "砂糖 Sugar", "packQty": "1", "packUnit": "kg", "price": "13" },
+    { "id": "water", "name": "水 Water", "packQty": "1", "packUnit": "l", "price": "0" },
+    {
+      "id": "soy",
+      "name": "生抽 Light soy sauce",
+      "packQty": "500",
+      "packUnit": "ml",
+      "price": "16",
+      "density": "1.2"
+    },
+    {
+      "id": "honey",
+      "name": "蜜糖 Honey",
+      "packQty": "500",
+      "packUnit": "g",
+      "price": "45",
+      "density": "1.42"
+    },
+    {
+      "id": "five-spice",
+      "name": "五香粉 Five-spice powder",
+      "packQty": "2",
+      "packUnit": "tael",
+      "price": "12",
+      "density": "0.5"
+    },
+    {
+      "id": "tea",
+      "name": "紅茶葉 Black tea leaves",
+      "packQty": "1",
+      "packUnit": "lb",
+      "price": "85"
+    },
+    {
+      "id": "evap-milk",
+      "name": "淡奶 Evaporated milk",
+      "packQty": "410",
+      "packUnit": "g",
+      "price": "11.5",
+      "density": "1.07"
+    },
+    {
+      "id": "lemon",
+      "name": "檸檬 Lemon",
+      "packQty": "1",
+      "packUnit": "piece",
+      "price": "4.5",
+      "pieceWeight": "120"
+    },
+    {
+      "id": "egg",
+      "name": "雞蛋 Egg",
+      "packQty": "30",
+      "packUnit": "piece",
+      "price": "48",
+      "pieceWeight": "55"
+    },
+    {
+      "id": "greens",
+      "name": "菜心 Choi sum",
+      "packQty": "1",
+      "packUnit": "catty",
+      "price": "16",
+      "yieldPercent": "80"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "syrup",
+      "name": "糖水 Sugar syrup",
+      "yieldQty": "1",
+      "yieldUnit": "l",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "sugar" }, "qty": "600", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "water" }, "qty": "650", "unit": "ml" }
+      ]
+    },
+    {
+      "id": "char-siu-glaze",
+      "name": "叉燒醬 Char siu glaze",
+      "yieldQty": "500",
+      "yieldUnit": "ml",
+      "density": "1.25",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "honey" }, "qty": "200", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "soy" }, "qty": "6", "unit": "tbsp" },
+        { "ref": { "kind": "ingredient", "id": "five-spice" }, "qty": "2", "unit": "tsp" },
+        { "ref": { "kind": "recipe", "id": "syrup" }, "qty": "150", "unit": "ml" }
+      ]
+    },
+    {
+      "id": "char-siu",
+      "name": "叉燒 Char siu",
+      "yieldQty": "12",
+      "yieldUnit": "portion",
+      "lines": [
+        { "ref": { "kind": "ingredient", "id": "pork-shoulder" }, "qty": "3", "unit": "catty" },
+        {
+          "ref": { "kind": "recipe", "id": "char-siu-glaze" },
+          "qty": "250",
+          "unit": "ml",
+          "wastePercent": "10"
+        }
+      ]
+    },
+    {
+      "id": "char-siu-rice",
+      "name": "叉燒飯 Char siu rice",
+      "yieldQty": "1",
+      "yieldUnit": "portion",
+      "lines": [
+        { "ref": { "kind": "recipe", "id": "char-siu" }, "qty": "1", "unit": "portion" },
+        { "ref": { "kind": "ingredient", "id": "rice" }, "qty": "120", "unit": "g" },
+        { "ref": { "kind": "ingredient", "id": "greens" }, "qty": "1.5", "unit": "tael" },
+        { "ref": { "kind": "ingredient", "id": "egg" }, "qty": "1", "unit": "piece" }
+      ]
+    },
+    {
+      "id": "milk-tea",
+      "name": "熱奶茶 Hot milk tea",
+      "yieldQty": "1",
+      "yieldUnit": "portion",
+      "lines": [
+        {
+          "ref": { "kind": "ingredient", "id": "tea" },
+          "qty": "12",
+          "unit": "g",
+          "wastePercent": "5"
+        },
+        { "ref": { "kind": "ingredient", "id": "evap-milk" }, "qty": "60", "unit": "ml" },
+        { "ref": { "kind": "recipe", "id": "syrup" }, "qty": "20", "unit": "ml" }
+      ]
+    },
+    {
+      "id": "iced-lemon-tea",
+      "name": "凍檸茶 Iced lemon tea",
+      "yieldQty": "1",
+      "yieldUnit": "portion",
+      "lines": [
+        {
+          "ref": { "kind": "ingredient", "id": "tea" },
+          "qty": "10",
+          "unit": "g",
+          "wastePercent": "5"
+        },
+        { "ref": { "kind": "ingredient", "id": "lemon" }, "qty": "0.5", "unit": "piece" },
+        { "ref": { "kind": "recipe", "id": "syrup" }, "qty": "30", "unit": "ml" }
+      ]
+    }
+  ],
+  "menu": [
+    {
+      "id": "m-char-siu-rice",
+      "name": "叉燒飯 Char siu rice",
+      "recipeId": "char-siu-rice",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "52",
+      "priceIncludesService": false,
+      "targetPercent": "32",
+      "rounding": "ending-8"
+    },
+    {
+      "id": "m-milk-tea",
+      "name": "熱奶茶 Hot milk tea",
+      "recipeId": "milk-tea",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "19",
+      "priceIncludesService": false,
+      "targetPercent": "25",
+      "rounding": "1"
+    },
+    {
+      "id": "m-iced-lemon-tea",
+      "name": "凍檸茶 Iced lemon tea",
+      "recipeId": "iced-lemon-tea",
+      "portionQty": "1",
+      "portionUnit": "portion",
+      "price": "22",
+      "priceIncludesService": true,
+      "targetPercent": "25",
+      "rounding": "1"
+    },
+    {
+      "id": "m-char-siu-extra",
+      "name": "加叉燒 Extra char siu",
+      "recipeId": "char-siu",
+      "portionQty": "0.5",
+      "portionUnit": "portion",
+      "price": "28",
+      "priceIncludesService": false,
+      "targetPercent": "35",
+      "rounding": "0.5"
+    }
+  ]
+}

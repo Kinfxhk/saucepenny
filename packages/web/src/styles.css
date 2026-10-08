@@ -1,0 +1,416 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+:root {
+  --bg: #faf6f1;
+  --panel: #ffffff;
+  --text: #221b17;
+  --muted: #5a4f48;
+  --line: #d4c9bf;
+  --accent: #7a3b1e;
+  --accent-text: #ffffff;
+  --warn-bg: #fdecea;
+  --warn: #9b1c1c;
+  --good: #1d6b38;
+  --good-bg: #e3f3e8;
+  --watch: #7a4f00;
+  --watch-bg: #fff3d6;
+  --high: #9b1c1c;
+  --high-bg: #fde4e1;
+  --focus: #b35c00;
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  --bg: #17120f;
+  --panel: #221b17;
+  --text: #f1e9e2;
+  --muted: #c4b6ab;
+  --line: #4a3d35;
+  --accent: #f0a77e;
+  --accent-text: #1d120c;
+  --warn-bg: #3b1d1d;
+  --warn: #ffb4ab;
+  --good: #8fd9a8;
+  --good-bg: #183324;
+  --watch: #ffd27a;
+  --watch-bg: #3a2c10;
+  --high: #ffb4ab;
+  --high-bg: #44201d;
+  --focus: #ffb35c;
+  color-scheme: dark;
+}
+html {
+  font-size: 100%;
+}
+html[data-size='large'] {
+  font-size: 125%;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Noto Sans TC',
+    'PingFang HK',
+    'Microsoft JhengHei',
+    sans-serif;
+  line-height: 1.5;
+}
+a {
+  color: var(--accent);
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 0.5rem;
+  background: var(--panel);
+  padding: 0.5rem 1rem;
+}
+.skip:focus {
+  left: 0.5rem;
+  z-index: 10;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+.brand h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.brand p {
+  margin: 0;
+  color: var(--muted);
+}
+.settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+.settings label {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.dev-banner {
+  margin: 0;
+  padding: 0.4rem 1.5rem;
+  background: var(--watch-bg);
+  color: var(--watch);
+  font-weight: 600;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.75rem 1.5rem 0;
+  max-width: 100rem;
+  margin: 0 auto;
+}
+.tabs [role='tab'] {
+  border-radius: 0.4rem 0.4rem 0 0;
+  border-bottom: none;
+  padding: 0.45rem 1rem;
+}
+.tabs [role='tab'][aria-selected='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+main {
+  padding: 0 1.5rem 1rem;
+  max-width: 100rem;
+  margin: 0 auto;
+}
+main > section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0 0.5rem 0.5rem 0.5rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+h2 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+h4 {
+  margin: 1rem 0 0.5rem;
+}
+.help,
+.muted {
+  color: var(--muted);
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+input,
+select,
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.45rem;
+  min-height: 2rem;
+}
+input[type='checkbox'] {
+  min-height: auto;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+input.num {
+  width: 7rem;
+  text-align: right;
+}
+.portion input.num {
+  width: 5rem;
+}
+[aria-invalid='true'] {
+  border: 2px solid var(--warn);
+  background: var(--warn-bg);
+}
+button {
+  cursor: pointer;
+  background: var(--bg);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+button.danger {
+  color: var(--warn);
+}
+button.remove {
+  min-width: 2rem;
+}
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  background: var(--bg);
+  cursor: pointer;
+}
+.file-button:focus-within {
+  outline: 3px solid var(--focus);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin: 0.5rem 0 0.75rem;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.3rem 0.4rem;
+  text-align: left;
+  vertical-align: middle;
+}
+th {
+  font-weight: 600;
+}
+td.out,
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+tfoot th,
+tfoot td {
+  font-weight: 700;
+}
+.split {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  gap: 1rem;
+}
+@media (max-width: 48rem) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+.recipe-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+.recipe-list li button {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.25rem;
+}
+.recipe-list li button[aria-current='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.sub-row td {
+  border-bottom: 1px dashed var(--line);
+  padding-left: 1.5rem;
+  color: var(--muted);
+}
+.sub-card ul {
+  margin: 0.25rem 0;
+}
+details.tool {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem;
+}
+details.tool summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.problems {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--warn);
+  background: var(--warn-bg);
+  border-radius: 0.4rem;
+}
+.problems-title {
+  margin: 0;
+  font-weight: 700;
+}
+.problem,
+.problem-list {
+  color: var(--warn);
+}
+.status-box p {
+  margin: 0.5rem 0 0;
+}
+.status-box ul {
+  margin: 0.25rem 0 0.5rem;
+}
+td[data-band='good'] {
+  background: var(--good-bg);
+  color: var(--good);
+}
+td[data-band='watch'] {
+  background: var(--watch-bg);
+  color: var(--watch);
+}
+td[data-band='high'] {
+  background: var(--high-bg);
+  color: var(--high);
+  font-weight: 700;
+}
+.bottom {
+  padding: 1rem 1.5rem 2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 100rem;
+  margin: 0 auto;
+}
+.bottom p {
+  margin: 0.25rem 0;
+}
+.print-area {
+  display: none;
+}
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .top,
+  .tabs,
+  main,
+  .skip,
+  .dev-banner {
+    display: none !important;
+  }
+  .print-area {
+    display: block;
+  }
+  .print-card {
+    break-inside: avoid;
+    margin-bottom: 1.5rem;
+  }
+  .print-card h2 {
+    font-size: 1.1rem;
+  }
+  .print-area th,
+  .print-area td {
+    border-bottom: 1px solid #999;
+    color: #000;
+  }
+  .bottom {
+    color: #000;
+  }
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.8em;
+  }
+}
+#menu-table input[type='text']:not(.num) {
+  width: 10rem;
+}
+#menu-table select {
+  max-width: 10rem;
+}
+#menu-table input.num {
+  width: 4.5rem;
+}
+#menu-table td.portion {
+  white-space: nowrap;
+}
+#ingredient-table input[type='text']:not(.num) {
+  width: 12rem;
+}
+#ingredient-table input.num {
+  width: 5.5rem;
+}

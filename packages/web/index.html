@@ -18,6 +18,7 @@
     <title>Saucepenny · 菜本易</title>
   </head>
   <body>
+    <a class="skip" href="#app" data-t="app.skip">Skip to the editor</a>
     <header class="top">
       <div class="brand">
         <img src="./icon.svg" alt="" width="40" height="40" />
@@ -26,10 +27,82 @@
           <p data-t="app.tagline">Free, offline recipe costing and menu pricing.</p>
         </div>
       </div>
+      <div class="settings">
+        <label
+          ><span data-t="settings.lang">Language</span>
+          <select id="lang">
+            <option value="en">English</option>
+            <option value="zh-HK">繁體中文</option>
+          </select></label
+        >
+        <label
+          ><span data-t="settings.theme">Theme</span>
+          <select id="theme">
+            <option value="system" data-t="settings.theme.system">System</option>
+            <option value="light" data-t="settings.theme.light">Light</option>
+            <option value="dark" data-t="settings.theme.dark">Dark</option>
+          </select></label
+        >
+        <label class="check"
+          ><input type="checkbox" id="large" />
+          <span data-t="settings.large">Large text</span></label
+        >
+      </div>
     </header>
-    <main id="app">
-      <p class="dev-banner" id="dev-banner">In development · 開發中</p>
+    <p class="dev-banner" id="dev-banner">In development · 開發中</p>
+    <nav class="tabs" role="tablist" id="tablist">
+      <button
+        type="button"
+        role="tab"
+        id="tab-ingredients"
+        aria-controls="panel-ingredients"
+        data-t="tab.ingredients"
+      >
+        Ingredients
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="tab-recipes"
+        aria-controls="panel-recipes"
+        data-t="tab.recipes"
+      >
+        Recipes
+      </button>
+      <button type="button" role="tab" id="tab-menu" aria-controls="panel-menu" data-t="tab.menu">
+        Menu
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="tab-impact"
+        aria-controls="panel-impact"
+        data-t="tab.impact"
+      >
+        Price change
+      </button>
+      <button type="button" role="tab" id="tab-data" aria-controls="panel-data" data-t="tab.data">
+        Data &amp; settings
+      </button>
+    </nav>
+    <main id="app" tabindex="-1">
+      <div id="problems" class="problems" role="alert" hidden></div>
+      <div class="status-box" aria-live="polite">
+        <p id="status"></p>
+        <ul id="status-list"></ul>
+      </div>
+      <section
+        id="panel-ingredients"
+        role="tabpanel"
+        aria-labelledby="tab-ingredients"
+        hidden
+      ></section>
+      <section id="panel-recipes" role="tabpanel" aria-labelledby="tab-recipes" hidden></section>
+      <section id="panel-menu" role="tabpanel" aria-labelledby="tab-menu" hidden></section>
+      <section id="panel-impact" role="tabpanel" aria-labelledby="tab-impact" hidden></section>
+      <section id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden></section>
     </main>
+    <div id="print-area" class="print-area"></div>
     <footer class="bottom">
       <p data-t="footer.privacy">Your data stays in this browser.</p>
       <p data-t="footer.disclaimer">Estimates only, not accounting or tax advice.</p>

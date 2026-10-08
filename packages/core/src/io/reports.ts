@@ -7,7 +7,14 @@
 import { verifiedImpact, verifiedProject, type VerifiedProject } from '../api';
 import { describeError, type Lang } from '../i18n/index';
 import type { Project, UnitRef } from '../model/index';
-import { div, formatMoney, formatPercent, formatQuantity, type Rational } from '../num/index';
+import {
+  div,
+  formatFixed,
+  formatMoney,
+  formatPercent,
+  formatQuantity,
+  type Rational,
+} from '../num/index';
 import { UNITS, isUnitId } from '../units/index';
 import { ENGINE_VERSION, RULES_VERSION } from '../version';
 import { toCsv } from './csv';
@@ -78,13 +85,20 @@ const T = {
 
 export const reportText = (lang: Lang) => T[lang];
 
-export function unitLabel(ref: UnitRef, project: Project, lang: Lang): string {
-  if (ref === 'portion') return T[lang].portion;
+export function unitLabel(ref: UnitRef, project: Project, lang: Lang, qty?: Rational): string {
+  if (ref === 'portion')
+    return lang === 'en' && qty !== undefined && !(qty.n === 1n && qty.d === 1n)
+      ? 'portions'
+      : T[lang].portion;
   if (isUnitId(ref)) return lang === 'en' ? UNITS[ref].en : UNITS[ref].zh;
   return project.measures.get(ref.slice('measure:'.length))?.name ?? ref;
 }
 
 const pct = (r: Rational) => `${formatPercent(r)}%`;
+
+/** Money per unit: 4 decimals below 1 (e.g. 0.0456 per ml), otherwise cents. */
+export const formatUnitMoney = (x: Rational): string =>
+  x.n !== 0n && (x.n < 0n ? -x.n : x.n) < x.d ? formatFixed(x, 4) : formatMoney(x);
 
 export interface CardLine {
   name: string;
@@ -117,6 +131,7 @@ export function recipeCard(
   const vr = v.recipes.get(id)!;
   const ok = vr.status === 'ok' ? vr : null;
   const unit = unitLabel(r.yieldUnit, project, lang);
+  const yieldUnitText = unitLabel(r.yieldUnit, project, lang, r.yieldQty);
   const lines = r.lines.map((l, j): CardLine => {
     const name =
       l.ref.kind === 'ingredient'
@@ -127,7 +142,7 @@ export function recipeCard(
       name,
       isRecipe: l.ref.kind === 'recipe',
       qty: formatQuantity(l.qty),
-      unit: unitLabel(l.unit, project, lang),
+      unit: unitLabel(l.unit, project, lang, l.qty),
       waste: l.waste.n === 0n ? '' : pct(l.waste),
       cost: cost ? formatMoney(cost) : '',
       share: cost && ok && ok.total.n !== 0n ? pct(div(cost, ok.total)) : '',
@@ -136,9 +151,9 @@ export function recipeCard(
   return {
     id,
     name: r.name,
-    yieldText: `${formatQuantity(r.yieldQty)} ${unit}`,
+    yieldText: `${formatQuantity(r.yieldQty)} ${yieldUnitText}`,
     total: ok ? formatMoney(ok.total) : null,
-    perUnit: ok ? formatMoney(ok.perYieldUnit) : null,
+    perUnit: ok ? formatUnitMoney(ok.perYieldUnit) : null,
     perUnitLabel: unit,
     lines,
     problem:
@@ -177,7 +192,7 @@ export function menuRows(project: Project, v: VerifiedProject, lang: Lang): Menu
       id: item.id,
       name: item.name,
       recipe: project.recipes.get(item.recipeId)!.name,
-      portion: `${formatQuantity(item.portionQty)} ${unitLabel(item.portionUnit, project, lang)}`,
+      portion: `${formatQuantity(item.portionQty)} ${unitLabel(item.portionUnit, project, lang, item.portionQty)}`,
       price: formatMoney(item.price),
       includesService: item.priceIncludesService,
       net: ok ? formatMoney(ok.netPrice) : null,

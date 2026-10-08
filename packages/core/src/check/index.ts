@@ -103,14 +103,32 @@ export class Checker {
     for (const id of this.project.recipes.keys()) if (!state.has(id)) visit(id, []);
   }
 
+  private touching: Set<string> | undefined;
+
   /** Is this recipe on, or does it depend on, a cycle? */
-  touchesCycle(id: string, seen = new Set<string>()): boolean {
-    if (this.cyclic.has(id)) return true;
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return this.project.recipes
-      .get(id)!
-      .lines.some((l) => l.ref.kind === 'recipe' && this.touchesCycle(l.ref.id, seen));
+  touchesCycle(id: string): boolean {
+    if (!this.touching) {
+      // Walk backwards from every recipe on a cycle to everything that uses it.
+      const usedBy = new Map<string, string[]>();
+      for (const r of this.project.recipes.values())
+        for (const l of r.lines)
+          if (l.ref.kind === 'recipe') {
+            const list = usedBy.get(l.ref.id) ?? [];
+            list.push(r.id);
+            usedBy.set(l.ref.id, list);
+          }
+      const touching = new Set(this.cyclic);
+      const queue = [...this.cyclic];
+      while (queue.length) {
+        for (const parent of usedBy.get(queue.pop()!) ?? [])
+          if (!touching.has(parent)) {
+            touching.add(parent);
+            queue.push(parent);
+          }
+      }
+      this.touching = touching;
+    }
+    return this.touching.has(id);
   }
 
   /** Raw packs needed for ONE whole batch of a recipe, and its nesting height (memoised). */
@@ -160,6 +178,7 @@ export class Checker {
     j: number,
     batches: Rational,
     packs: Map<string, Rational>,
+    moneyInto?: { total: Rational },
   ): CheckFailure | undefined {
     const line = recipe.lines[j]!;
     const from = scaleOf(line.unit, this.project.measures);
@@ -187,11 +206,31 @@ export class Checker {
     );
     if (!inYieldUnits) return 'units';
     const childBatches = div(div(mul(inYieldUnits, batches), child.yieldQty), keep);
+    if (moneyInto) {
+      // Same expansion, priced once per sub-recipe batch (memoised) instead of per line.
+      const money = this.batchMoney(child.id);
+      if (typeof money === 'string') return money;
+      moneyInto.total = add(moneyInto.total, mul(money, childBatches));
+      return undefined;
+    }
     const childPacks = this.batchPacks(child.id);
     if (typeof childPacks === 'string') return childPacks;
     for (const [id, n] of childPacks)
       packs.set(id, add(packs.get(id) ?? ZERO, mul(n, childBatches)));
     return undefined;
+  }
+
+  private readonly moneyMemo = new Map<string, Rational | CheckFailure>();
+
+  /** Money for one whole batch of a recipe: its raw packs, priced (memoised). */
+  private batchMoney(id: string): Rational | CheckFailure {
+    let m = this.moneyMemo.get(id);
+    if (m === undefined) {
+      const packs = this.batchPacks(id);
+      m = typeof packs === 'string' ? packs : this.price(packs);
+      this.moneyMemo.set(id, m);
+    }
+    return m;
   }
 
   /** Money for a set of packs. */
@@ -214,7 +253,18 @@ export class Checker {
     return new Map([...batch].map(([id, n]) => [id, mul(n, batches)]));
   }
 
+  private readonly recipeMemo = new Map<string, RecomputedRecipe | CheckFailure>();
+
   recipe(recipeId: string): RecomputedRecipe | CheckFailure {
+    let res = this.recipeMemo.get(recipeId);
+    if (!res) {
+      res = this.recomputeRecipe(recipeId);
+      this.recipeMemo.set(recipeId, res);
+    }
+    return res;
+  }
+
+  private recomputeRecipe(recipeId: string): RecomputedRecipe | CheckFailure {
     if (this.touchesCycle(recipeId)) return 'cycle';
     const r = this.project.recipes.get(recipeId)!;
     const lineCosts: Rational[] = [];
@@ -223,12 +273,27 @@ export class Checker {
     if (typeof all === 'string') return all;
     for (let j = 0; j < r.lines.length; j++) {
       const packs = new Map<string, Rational>();
-      const err = this.lineInto(r, j, rat(1n), packs);
+      const money = { total: ZERO };
+      const err = this.lineInto(r, j, rat(1n), packs, money);
       if (err) return err;
-      lineCosts.push(this.price(packs));
+      lineCosts.push(add(money.total, this.price(packs)));
     }
-    const total = this.price(all);
+    const total = this.batchMoney(recipeId) as Rational; // = price(all)
     return { total, perYieldUnit: div(total, r.yieldQty), lineCosts };
+  }
+
+  /** Money for one `unit` of usable ingredient (e.g. per kg), via its pack. */
+  ingredientUnitCost(ingredientId: string, unit: UnitRef): Rational | CheckFailure {
+    const ing = this.project.ingredients.get(ingredientId)!;
+    const packs = amountIn(
+      rat(1n),
+      scaleOf(unit, this.project.measures),
+      scaleOf(ing.packUnit, this.project.measures),
+      ing.density,
+      ing.pieceWeight,
+    );
+    if (!packs) return 'units';
+    return mul(div(packs, ing.packQty), this.packCost.get(ing.id)!);
   }
 
   /** Cost of `qty` `unit` of a recipe (e.g. one portion, or 300 g of soup). */
