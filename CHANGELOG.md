@@ -21,4 +21,9 @@ All notable changes to Saucepenny are documented here. The format follows
 - Menu pricing: cost per portion, net price without service charge, food cost %, gross
   profit, colour bands, suggested price rounded up and the real food cost % at it; price
   change impact through sub-recipes; batch scaling and "how much can I make".
+- CSV per RFC 4180 with formula-injection protection; ingredient CSV import (English or
+  Chinese headers, 斤/兩, full-width digits, thousands commas) with row-level errors;
+  recipe and menu CSV exports; bilingual error messages.
+- Command line: `saucepenny cost | check | impact`, printing the same verified text as the
+  core report.
 - Written calculation rules (docs/calculation-rules.md).

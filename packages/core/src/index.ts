@@ -7,3 +7,5 @@ export * from './graph/index';
 export * from './cost/index';
 export { Checker, isValidSuggestion } from './check/index';
 export * from './api';
+export * from './i18n/index';
+export * from './io/index';
